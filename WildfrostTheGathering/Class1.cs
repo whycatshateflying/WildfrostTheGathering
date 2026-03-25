@@ -169,39 +169,53 @@ namespace WildfrostTheGathering
         // Reduce counter temporarily
         public class StatusEffectOngoingCounter : StatusEffectOngoing
         {
-            private int buffer = 0;
+            public int energyPoints = 0;
             public override IEnumerator Add(int add)
             {
-                target.counter.max += add;
+                int toAdd = add;
+                Debug.Log("[WildfrostTheGathering] Adding " + add + " Remove Counter to " + target.name);
+                while (toAdd < 0 && energyPoints > 0 && target.counter.max == 1)
+                {
+                    toAdd++;
+                    energyPoints--;
+                }
+
+                target.counter.max += toAdd;
+
                 if (target.counter.max < 1)
                 {
-                    buffer += 1 - target.counter.max;
+                    energyPoints += 1 - target.counter.max;
                     target.counter.max = 1;
                 }
 
-                target.counter.current = Math.Min(Math.Max(0, target.counter.current + add), target.counter.max);
+
+                target.counter.current = Math.Min(Math.Max(0, target.counter.current + toAdd), target.counter.max);
 
                 target.PromptUpdate();
-                Debug.Log("[WildfrostTheGathering] Adding " + add + " Remove Counter to " + target.name);
                 yield break;
             }
 
             public override IEnumerator Remove(int remove)
             {
-                buffer -= remove;
-                target.counter.max -= buffer;
+                int toRemove = remove;
+                Debug.Log("[WildfrostTheGathering] Removing " + remove + " Remove Counter to " + target.name);
+                while (toRemove < 0 && energyPoints > 0 && target.counter.max == 1)
+                {
+                    toRemove++;
+                    energyPoints--;
+                }
 
-                buffer = Math.Max(0, buffer);
+                target.counter.max -= toRemove;
 
                 if (target.counter.max < 1)
                 {
+                    energyPoints += 1 - target.counter.max;
                     target.counter.max = 1;
                 }
 
-                target.counter.current = Math.Min(Math.Max(0, target.counter.current - remove), target.counter.max);
+                target.counter.current = Math.Min(Math.Max(0, target.counter.current - toRemove), target.counter.max);
 
                 target.PromptUpdate();
-                Debug.Log("[WildfrostTheGathering] Removing " + remove + " Remove Counter to " + target.name);
                 yield break;
             }
         }
@@ -263,7 +277,6 @@ namespace WildfrostTheGathering
 
             public IEnumerator RemoveOnTurnEnd(Entity entity)
             {
-                Debug.Log("[WildfrostTheGathering] Unplayable removed from " + target.data.name + "!");
                 target.data.canPlayOnBoard = target.data.original.canPlayOnBoard;
                 target.data.canPlayOnEnemy = target.data.original.canPlayOnEnemy;
                 target.data.canPlayOnFriendly = target.data.original.canPlayOnFriendly;
@@ -278,7 +291,6 @@ namespace WildfrostTheGathering
                         {
                             target.display.promptUpdateDescription = true;
                             target.PromptUpdate();
-                            Debug.Log("[WildfrostTheGathering] Unplayable removed");
                             break;
                         }
                     };
@@ -324,25 +336,25 @@ namespace WildfrostTheGathering
 
             public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
             {
-                Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn");
+                //Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn");
                 if (allowedTimes > 0 && numTimesPlayed++ > allowedTimes)
                 {
-                    Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
+                    //Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
                     return false;
                 }
                 if (!target.enabled)
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but was not enabled");
+                    //Debug.Log("[WildfrostTheGathering] ...but was not enabled");
                     return false;
                 }
                 if (target == entity)
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but was myself (" + target.name + ")");
+                    //Debug.Log("[WildfrostTheGathering] ...but was myself (" + target.name + ")");
                     return false;
                 }
                 if ((object)allowedCardType != null && allowedCardType.name != entity.data.cardType.name)
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but was the wrong card type");
+                    //Debug.Log("[WildfrostTheGathering] ...but was the wrong card type");
                     return false;
                 }
 
@@ -351,7 +363,7 @@ namespace WildfrostTheGathering
                 TraitData[] array = allowedTraits;
                 if (array != null && array.Length > 0 && !source2.ToList().ContainsAny(allowedTraits))
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but didn't have the trait");
+                    //Debug.Log("[WildfrostTheGathering] ...but didn't have the trait");
                     return false;
                 }
 
@@ -416,14 +428,12 @@ namespace WildfrostTheGathering
                 {
                     List<Entity> allies = entity.GetAllies();
                     num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait))));
-                    Debug.Log("[WildfrostTheGathering] Get allies called: " + num + " total found");
                 }
 
                 if (enemies)
                 {
                     List<Entity> enemies = entity.GetEnemies();
                     num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait))));
-                    Debug.Log("[WildfrostTheGathering] Get enemies called: " + num + " total found");
                 }
                 return num;
             }
@@ -437,14 +447,12 @@ namespace WildfrostTheGathering
                     {
                         List<Entity> allies = entity.GetEnemiesInRow(rowIndex);
                         num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait))));
-                        Debug.Log("[WildfrostTheGathering] Get allies in row called: " + num + " total found");
                     }
 
                     if (enemies)
                     {
                         List<Entity> enemies = entity.GetEnemiesInRow(rowIndex);
                         num += entity.GetEnemiesInRow(rowIndex).Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait))));
-                        Debug.Log("[WildfrostTheGathering] Get enemies in row called: " + num + " total found");
                     }
                 }
                 return num;
@@ -455,6 +463,11 @@ namespace WildfrostTheGathering
         public class StatusEffectWhileActiveXUpdatesOnTrait : StatusEffectWhileActiveX
         {
             public string alsoActivate;
+            public override void Init()
+            {
+                base.OnEntityDestroyed += Check;
+                base.Init();
+            }
             public override IEnumerator CardMove(Entity entity)
             {
                 if (target == entity)
@@ -512,16 +525,41 @@ namespace WildfrostTheGathering
                     {
                         yield return Affect(entity);
                     }
-                    else if (entity.preContainers.Length == 0 || entity.preContainers[0] is CardHand || entity.preContainers[0] is CardStack)
+                    else if (entity.preContainers.Length == 0 || !(entity.preContainers[0].GetType() == entity.containers[0].GetType()))
                     {
                         foreach (Entity.TraitStacks trait in entity.traits)
                         {
                             if (trait.data.name.Equals(alsoActivate))
                             {
+                                //Debug.Log("[WildfrostTheGathering] beep " + entity.name + " was moved to " + entity.containers[0].name);
                                 yield return Deactivate();
                                 yield return Activate();
+                                break;
                             }
                         }
+                    }
+                }
+            }
+            public override bool RunEntityDestroyedEvent(Entity entity, DeathType deathType)
+            {
+                int num = affected.IndexOf(entity);
+                if (num >= 0)
+                {
+                    affected.RemoveAt(num);
+                }
+
+                return true;
+            }
+            public IEnumerator Check(Entity entity, DeathType deathType)
+            {
+                //Debug.Log("[WildfrostTheGathering] beep " + entity.name + " was killed");
+                foreach (Entity.TraitStacks trait in entity.traits)
+                {
+                    if (trait.data.name.Equals(alsoActivate))
+                    {
+                        yield return Deactivate();
+                        yield return Activate();
+                        break;
                     }
                 }
             }
