@@ -1,7 +1,9 @@
 ﻿using AbsentAvalanche;
 using AbsentAvalanche.Builders.Cards.Items;
+using AbsentAvalanche.StatusEffectImplementations;
 using Deadpan.Enums.Engine.Components.Modding;
 using HarmonyLib;
+using NaughtyAttributes.Test;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -166,14 +168,14 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Reduce counter temporarily
+        // Reduce counter temporarily. Thank you semmie for logic help!
         public class StatusEffectOngoingCounter : StatusEffectOngoing
         {
             public int energyPoints = 0;
             public override IEnumerator Add(int add)
             {
                 int toAdd = add;
-                Debug.Log("[WildfrostTheGathering] Adding " + add + " Remove Counter to " + target.name);
+                Debug.Log("[WildfrostTheGathering] Adding " + add + " Counter to " + target.name);
                 while (toAdd < 0 && energyPoints > 0 && target.counter.max == 1)
                 {
                     toAdd++;
@@ -198,7 +200,7 @@ namespace WildfrostTheGathering
             public override IEnumerator Remove(int remove)
             {
                 int toRemove = remove;
-                Debug.Log("[WildfrostTheGathering] Removing " + remove + " Remove Counter to " + target.name);
+                Debug.Log("[WildfrostTheGathering] Removing " + remove + " Counter from " + target.name);
                 while (toRemove < 0 && energyPoints > 0 && target.counter.max == 1)
                 {
                     toRemove++;
@@ -262,6 +264,7 @@ namespace WildfrostTheGathering
             {
                 base.OnBegin += OnFirstAdd;
                 base.OnTurnEnd += RemoveOnTurnEnd;
+                Events.OnBattleEnd += RemoveAfterBattle;
             }
 
             public IEnumerator OnFirstAdd()
@@ -293,9 +296,31 @@ namespace WildfrostTheGathering
                             target.PromptUpdate();
                             break;
                         }
-                    };
+                    }
                 }
                 yield return Remove();
+            }
+            public void RemoveAfterBattle()
+            {
+                Debug.Log("[WildfrostTheGathering] Is this battle end?");
+                target.data.canPlayOnBoard = target.data.original.canPlayOnBoard;
+                target.data.canPlayOnEnemy = target.data.original.canPlayOnEnemy;
+                target.data.canPlayOnFriendly = target.data.original.canPlayOnFriendly;
+                target.data.canPlayOnHand = target.data.original.canPlayOnHand;
+                target.data.playType = target.data.original.playType;
+                foreach (Entity.TraitStacks trait in target.traits.Clone())
+                {
+                    if (trait.data.name.Equals("whycats.wildfrost.wildfrostthegathering.Unplayable"))
+                    {
+                        Debug.Log("[WildfrostTheGathering] Unplayable found on " + target.data.name + "! Removing...");
+                        if (target.traits.Remove(trait))
+                        {
+                            target.display.promptUpdateDescription = true;
+                            target.PromptUpdate();
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -320,10 +345,12 @@ namespace WildfrostTheGathering
         {
             public int allowedTimes = 0;
             public int numTimesPlayed = 0;
+            public bool hasAttack = false;
             public CardType allowedCardType;
+            public bool countsSelf = false;
             public CardData[] allowedCards = Array.Empty<CardData>();
             public TraitData[] allowedTraits = Array.Empty<TraitData>();
-            private Hit _hackyHit;
+            public Hit _hackyHit;
 
             public override void Init()
             {
@@ -336,25 +363,30 @@ namespace WildfrostTheGathering
 
             public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
             {
-                //Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn");
+                // Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn");
                 if (allowedTimes > 0 && numTimesPlayed++ > allowedTimes)
                 {
-                    //Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
+                    // Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
                     return false;
                 }
                 if (!target.enabled)
                 {
-                    //Debug.Log("[WildfrostTheGathering] ...but was not enabled");
+                    // Debug.Log("[WildfrostTheGathering] ...but was not enabled");
                     return false;
                 }
-                if (target == entity)
+                if (!countsSelf && target == entity)
                 {
-                    //Debug.Log("[WildfrostTheGathering] ...but was myself (" + target.name + ")");
+                    // Debug.Log("[WildfrostTheGathering] ...but was myself (" + target.name + ")");
                     return false;
                 }
                 if ((object)allowedCardType != null && allowedCardType.name != entity.data.cardType.name)
                 {
-                    //Debug.Log("[WildfrostTheGathering] ...but was the wrong card type");
+                    // Debug.Log("[WildfrostTheGathering] ...but was the wrong card type (" + allowedCardType.name + ") and (" + entity.data.cardType.name + ")");
+                    return false;
+                }
+                if (hasAttack && !entity.data.hasAttack)
+                {
+                    // Debug.Log("[WildfrostTheGathering] ... but had no attack (" + entity.data.hasAttack + "), (" + entity.data.damage + ")");
                     return false;
                 }
 
@@ -363,12 +395,13 @@ namespace WildfrostTheGathering
                 TraitData[] array = allowedTraits;
                 if (array != null && array.Length > 0 && !source2.ToList().ContainsAny(allowedTraits))
                 {
-                    //Debug.Log("[WildfrostTheGathering] ...but didn't have the trait");
+                    // Debug.Log("[WildfrostTheGathering] ...but didn't have the trait");
                     return false;
                 }
 
                 _hackyHit = new Hit(entity, null);
                 CardData[] array2 = allowedCards;
+                // Debug.Log("[WildfrostTheGathering] " + array2 + " || " + array2.Length + " || " + allowedCards.ToList().Any((CardData c) => c.name == entity.data.name));
                 return array2 == null || array2.Length <= 0 || allowedCards.ToList().Any((CardData c) => c.name == entity.data.name);
             }
 
@@ -383,9 +416,28 @@ namespace WildfrostTheGathering
             }
         }
 
+        // This feels degenerate at this point... For use with applyEqualAmount
+        public class StatusEffectApplyXEqualToAttackOnCertainCardPlayed : StatusEffectApplyXOnCertainCardPlayed
+        {
+            public override void Init()
+            {
+                base.OnCardPlayed += Check;
+                if (allowedTimes > 0)
+                {
+                    base.OnTurnEnd += ResetTimes;
+                }
+            }
+            public new IEnumerator Check(Entity entity, Entity[] targets)
+            {
+                Debug.Log("[WildfrostTheGathering] Beep. Entity is " + entity.name + " and the damage is " + entity.damage.current);
+                return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), entity.damage.current);
+            }
+        }
+
         // StatusEffectApplyXPostAttack but now it works with applyEqualAmount. Thank you semmie!
         public class StatusEffectApplyXPostAttackEqualAmount : StatusEffectApplyX
         {
+            //StatusEffectApplyXPostAttack
             public override void Init()
             {
                 base.PostAttack += CheckHit;
@@ -459,7 +511,7 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Needed so the while active effect also updates if the certain trait is present (and is being played from hand, if that becomes relevant). Thank you semmie for the concept help!
+        // Needed so the while active effect also updates if the certain trait is present (and is being played from hand, if that becomes relevant). Thank you semmie and Abigail for the help!
         public class StatusEffectWhileActiveXUpdatesOnTrait : StatusEffectWhileActiveX
         {
             public string alsoActivate;
@@ -565,6 +617,48 @@ namespace WildfrostTheGathering
             }
         }
 
+        // Professional Face-Breaker Recycle to add effect
+        public class StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach : StatusEffectInstantDestroyCardsInHandAndApplyXForEach
+        {
+            public int maximum = 1;
+            public override IEnumerator Process()
+            {
+                Character player = References.Player;
+                int a = GetAmount();
+                yield return ModifiedDestroyCardsSequence(player.handContainer);
+                for (int i = 0; i < destroyed; i++)
+                {
+                    yield return StatusEffectSystem.Apply(target, target, effectToApply, a);
+                }
+
+                yield return Remove();
+            }
+            public IEnumerator ModifiedDestroyCardsSequence(CardContainer container)
+            {
+                bool pingDone = false;
+                List<Entity> list = new List<Entity>(container);
+                foreach (Entity item in list)
+                {
+                    Debug.Log("[WildfrostTheGathering] " + item.name + ". killed: " + destroyed);
+                    if (destroyed >= maximum)
+                    {
+                        break;
+                    }
+                    if (CheckConstraints(item))
+                    {
+                        if (!pingDone)
+                        {
+                            target.curveAnimator.Ping();
+                            pingDone = true;
+                        }
+
+                        destroyed++;
+                        yield return StatusEffectSystem.Apply(item, target, destroyCardEffect, 1, temporary: true);
+                    }
+                }
+            }
+        }
+        // TODO: Make flying and other targeting modes override each other visually
         private void CreateModAssets()
         {
             {  // Effects
@@ -613,12 +707,23 @@ namespace WildfrostTheGathering
 
                 // Summon Dragon Token
                 assets.Add( 
-                    StatusCopy("Summon Beepop", "Summon Dragon Token")  // Copy Summon Fallow effect but change it to summon a Dragon Spawn
+                    StatusCopy("Summon Beepop", "Summon Dragon Token")  // Copy Summon Beepop effect but change it to summon a Dragon Spawn
                     .WithText("Summon {0}")
                     .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.dragonToken>")
                     .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>  // Only once the cards are loaded
                     {
                         data.summonCard = TryGet<CardData>("dragonToken");
+                    })
+                    );
+
+                // Summon Dragon Token with Spark
+                assets.Add(
+                    StatusCopy("Summon Beepop", "Summon Spark Dragon Token")  // Copy Summon Beepop effect but change it to summon a Dragon Spawn
+                    .WithText("Summon {0}")
+                    .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.dragonTokenSpark>")
+                    .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>  // Only once the cards are loaded
+                    {
+                        data.summonCard = TryGet<CardData>("dragonTokenSpark");
                     })
                     );
 
@@ -671,16 +776,16 @@ namespace WildfrostTheGathering
                             tcht.trait = TryGet<TraitData>("Noomlin");
                             tcht.ignoreSilenced = false;
                         }),
+                            new Scriptable<TargetConstraintHasStatus>(tchs =>
+                        {
+                            tchs.not = true;
+                            tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
+                        }),
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
                             tcht.not = true;
                             tcht.trait = TryGet<TraitData>("Zoomlin");
                             tcht.ignoreSilenced = false;
-                        }),
-                            new Scriptable<TargetConstraintHasStatus>(tchs =>
-                        {
-                            tchs.not = true;
-                            tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
                         }),
                             new Scriptable<TargetConstraintHasStatus>(tchs =>
                         {
@@ -916,7 +1021,6 @@ namespace WildfrostTheGathering
                     })
                     );
 
-
                 // Earthquake Dragon: Ongoing reduce counter (stackable)
                 assets.Add(new StatusEffectDataBuilder(this)
                     .Create<StatusEffectOngoingCounter>("Ongoing Decrease Counter Stackable")
@@ -936,7 +1040,6 @@ namespace WildfrostTheGathering
                     );
 
                 // Earthquake Dragon: While active, reduce counter by number of allies with flying
-                // TODO: Make it go away when an ally is removed
                 assets.Add(new StatusEffectDataBuilder(this)
                     .Create<StatusEffectWhileActiveXUpdatesOnTrait>("While Active Reduce Counter By Allies With Flying")
                     .WithText("While active, reduce own <keyword=counter> by the number of {0} allies")
@@ -957,19 +1060,126 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                /* Ojutai, Soul of Winter
+                // Ojutai, Soul of Winter: When self or Flying ally attacks, apply 1 Snow to a random enemy
                 assets.Add(new StatusEffectDataBuilder(this)
-                    .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Apply Snow To Random Enemy")
-                    .WithText("Apply <{a}> <keyword=snow> to a random enemy whenever a {0} ally attacks")
-                    .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying")
+                    .Create<StatusEffectApplyXOnCertainCardPlayed>("On Card Played Apply Snow To Random Enemy")
+                    .WithText("Apply <{a}> <keyword=snow> to a random enemy whenever self or {0} ally attacks")
+                    .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                    .WithStackable(true)
+                    .WithCanBeBoosted(true)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                    {
+                        data.allowedTraits = new TraitData[1] { TryGet<TraitData>("whycats.wildfrost.wildfrostthegathering.Flying") };
+                        data.countsSelf = true;
+                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
+                        data.effectToApply = TryGet<StatusEffectSnow>("Snow");
+                    })
+                    );
+
+                // Professional Face-Breaker: Recycle Treasure to Draw on attack
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Destroy Right Treasure In Hand And Draw")
+                    .WithText("Destroy rightmost {0} in hand to <keyword=draw {a}>")
+                    .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
                     .WithStackable(true)
                     .WithCanBeBoosted(true)
                     .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                     {
-                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
-                        data.effectToApply = TryGet<StatusEffectSnow>("Snow");
+                        data.effectToApply = TryGet<StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach>("Instant Destroy Treasure In Hand And Draw For Each");
+                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     })
-                    );*/
+                    );
+
+                // Professional Face-Breaker: Recycle Treasure to Draw
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach>("Instant Destroy Treasure In Hand And Draw For Each")
+                    .WithStackable(true)
+                    .WithCanBeBoosted(false)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach>(data =>
+                    {
+                        data.destroyConstraints = new TargetConstraint[]
+                        {
+                            new Scriptable<TargetConstraintIsSpecificCard>(tcisc =>
+                            {
+                                tcisc.allowedCards = new CardData[]
+                                {
+                                    TryGet<CardData>("treasure"),
+                                };
+                            }),
+                        };
+                        data.destroyCardEffect = TryGet<StatusEffectInstantKill>("Kill");
+                        data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    })
+                    );
+
+                // Shivan Dragon: Apply Spice to applier
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectApplyXInstant>("Instant Apply Spice To Applier")
+                    .WithStackable(false)
+                    .WithCanBeBoosted(false)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                    {
+                        data.effectToApply = TryGet<StatusEffectSpice>("Spice");
+                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Applier;
+                        data.doPing = false;
+                        data.targetMustBeAlive = false;
+                    })
+                    );
+
+                // Shivan Dragon: Count Zoomlin cards in hand and gain Spice
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectApplyXPreTurn>("Pre Turn Count Zoomlin In Hand & Gain Spice For Each")
+                    .WithText("Before attacking, gain {a} <keyword=spice> for each card with <keyword=zoomlin> in hand")
+                    .WithStackable(true)
+                    .WithCanBeBoosted(true)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectApplyXPreTurn>(data =>
+                    {
+                        data.effectToApply = TryGet<StatusEffectApplyXInstant>("Instant Apply Spice To Applier");
+                        data.applyConstraints = new TargetConstraint[]
+                        {
+                            new Scriptable<TargetConstraintHasTrait>(tcht =>
+                            {
+                                tcht.trait = TryGet<TraitData>("Zoomlin");
+                                tcht.ignoreSilenced = false;
+                            }),
+                        };
+                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Hand;
+                    })
+                    );
+
+                // Manaform Hellkite: Instant Summon Dragon Token on Item played
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>("Summon Dragon Token On Item Played")
+                    .WithText("Summon a {0} with <keyword=attack> equal to the <keyword=attack> of items you play")
+                    .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.dragonTokenSpark>")
+                    .WithStackable(true)
+                    .WithCanBeBoosted(false)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>(data =>
+                    {
+                        data.allowedCardType = new CardType { item = true, name = "Item"};
+                        data.hasAttack = true;
+                        data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack");
+                        data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                        data.applyEqualAmount = true;
+                    })
+                    );
+
+                // Manaform Hellkite: Summon Dragon Token with equal health
+                assets.Add(new StatusEffectDataBuilder(this)
+                    .Create<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack")
+                    .WithStackable(false)
+                    .WithCanBeBoosted(false)
+                    .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                    {
+                        data.eventPriority = 99999;
+                        data.targetSummon = TryGet<StatusEffectSummon>("Summon Spark Dragon Token");
+                        data.summonPosition = StatusEffectInstantSummon.Position.InFrontOfOrOtherRow;
+                        data.withEffects = new StatusEffectData[]
+                        {
+                            TryGet<StatusEffectInstantSetAttack>("Set Attack"),
+                        };
+                    })
+                    );
 
             }  // Effects
 
@@ -978,8 +1188,8 @@ namespace WildfrostTheGathering
                 // Dragon Token
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("dragonToken", "Dragon Token")
-                    .SetSprites("dragon-baby.png", "dragon-baby-bg.png")
-                    .SetStats(1, 4, 4)
+                    .SetSprites("dragon-token-kyanner.png", "dragon-baby-bg.png")
+                    .SetStats(1, 4, 3)
                     .WithCardType("Summoned")
                     .WithFlavour("rawr!")
                     .WithValue(25)
@@ -990,6 +1200,25 @@ namespace WildfrostTheGathering
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
                         data.greetMessages = new string[1] { "Woah a token in the companion pool? That\'s not supposed to happen"};
+                    })
+                    );
+
+                // Dragon Token with Spark
+                assets.Add(
+                    new CardDataBuilder(this).CreateUnit("dragonTokenSpark", "Dragon Illusion Token")
+                    .SetSprites("dragon-illusion-token-amar.png", "dragon-baby-bg.png")
+                    .SetStats(1, 4, 3)
+                    .WithCardType("Summoned")
+                    .WithFlavour("rawr!")
+                    .WithValue(25)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>()
+                        {
+                            new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
+                            new CardData.TraitStacks(Get<TraitData>("Spark"), 1),
+                        };
+                        data.greetMessages = new string[1] { "Woah a token in the companion pool? That\'s not supposed to happen" };
                     })
                     );
 
@@ -1029,10 +1258,10 @@ namespace WildfrostTheGathering
                 // Goldspan Dragon
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("goldspanDragon", "Goldspan Dragon")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(6, 4, 4)
+                    .SetSprites("goldspan-dragon-amar.png", "dragon-lord-bg.png")
+                    .SetStats(7, 4, 4)
                     .WithCardType("Friendly")
-                    .WithFlavour("\"You see, most places have mice or mosquitoes...\"")
+                    .WithFlavour("<i>\"You see, most places have mice or mosquitoes...\"</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1047,17 +1276,17 @@ namespace WildfrostTheGathering
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
                         data.greetMessages = new string[2] { "<b>*Breathes Fire Loudly*</b>\n<i>How was it stuck in ice?</i>",
-                            "\"You see, most places have mice or mosquitoes...\""};
+                            "<i>\"You see, most places have mice or mosquitoes...\"</i>"};
                     })
                     );
 
                 // Ancient Copper Dragon
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("ancientCopperDragon", "Ancient Copper Dragon")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
+                    .SetSprites("ancient-copper-dragon-ajmanzan.png", "dragon-lord-bg.png")
                     .SetStats(8, 5, 5)
                     .WithCardType("Friendly")
-                    .WithFlavour("You can never have enough gold")
+                    .WithFlavour("<i>You can never have enough gold</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1070,17 +1299,17 @@ namespace WildfrostTheGathering
                         {
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
-                        data.greetMessages = new string[1] { "You can never have enough gold" };
+                        data.greetMessages = new string[1] { "<i>You can never have enough gold</i>" };
                     })
                     );
 
                 // Atsushi, Blazing Sky
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("atsushiBlazingSky", "Atsushi, the Blazing Sky")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(7, 3, 3)
+                    .SetSprites("atsushi-blazing-sky-vaminguez.png", "dragon-lord-bg.png")
+                    .SetStats(7, 4, 3)
                     .WithCardType("Friendly")
-                    .WithFlavour("Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b>")
+                    .WithFlavour("<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1093,19 +1322,19 @@ namespace WildfrostTheGathering
                         {
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
-                        data.greetMessages = new string[3] { "Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b>",
-                            "<b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b>",
-                            "The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b>" };
+                        data.greetMessages = new string[3] { "<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>",
+                            "<i><b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b></i>",
+                            "<i>The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b></i>" };
                     })
                     );
 
                 // Utvara Hellkite
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("utvaraHellkite", "Utvara Hellkite")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
+                    .SetSprites("utvara-hellkite-mzug.png", "dragon-lord-bg.png")
                     .SetStats(8, 4, 5)
                     .WithCardType("Friendly")
-                    .WithFlavour("The fear of dragons is as old and as powerful as the fear of death itself")
+                    .WithFlavour("<i>The fear of dragons is as old and as powerful as the fear of death itself</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1118,17 +1347,17 @@ namespace WildfrostTheGathering
                         {
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
-                        data.greetMessages = new string[1] { "The fear of dragons is as old and as powerful as the fear of death itself" };
+                        data.greetMessages = new string[1] { "<i>The fear of dragons is as old and as powerful as the fear of death itself</i>" };
                     })
                     );
 
                 // Dragonlord's Servant
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("dragonlordsServant", "Dragonlord's Servant")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(2, 1, 3)
+                    .SetSprites("dragonlords-servant-sprescott.png", "dragon-lord-bg.png")
+                    .SetStats(4, 1, 3)
                     .WithCardType("Friendly")
-                    .WithFlavour("The tastiest morsels rarely make it to their intended destination")
+                    .WithFlavour("<i>The tastiest morsels rarely make it to their intended destination</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1137,18 +1366,18 @@ namespace WildfrostTheGathering
                         {
                             new CardData.StatusEffectStacks(TryGet<StatusEffectData>("While Active Decrease Counter Of Flying Allies"), 1),
                         };
-                        data.greetMessages = new string[2] { "Atarka serving-goblins coat themselves with grease imbued with noxious herbs, hoping to discourage their ravenous masters from adding them to the meal",
-                            "The tastiest morsels rarely make it to their intended destination" };
+                        data.greetMessages = new string[2] { "<i>Atarka serving-goblins coat themselves with grease imbued with noxious herbs, hoping to discourage their ravenous masters from adding them to the meal</i>",
+                            "<i>The tastiest morsels rarely make it to their intended destination</i>" };
                     })
                     );
 
                 // Terror of the Peaks
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("terrorOfThePeaks", "Terror of the Peaks")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(5, 5, 5)
+                    .SetSprites("terror-of-the-peaks-jraphael.png", "dragon-lord-bg.png")
+                    .SetStats(6, 5, 5)
                     .WithCardType("Friendly")
-                    .WithFlavour("If it comes for you, die boldly or die swiftly—for die you will")
+                    .WithFlavour("<i>If it comes for you, die boldly or die swiftly—for die you will</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1161,17 +1390,17 @@ namespace WildfrostTheGathering
                         {
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                         };
-                        data.greetMessages = new string[1] { "If it comes for you, die boldly or die swiftly — for die you will" };
+                        data.greetMessages = new string[1] { "<i>If it comes for you, die boldly or die swiftly — for die you will</i>" };
                     })
                     );
 
                 // Captain Lannery Storm
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("captainLanneryStorm", "Captain Lannery Storm")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(1, 1, 4)
+                    .SetSprites("captain-lannery-storm-crallis.png", "dragon-lord-bg.png")
+                    .SetStats(3, 2, 3)
                     .WithCardType("Friendly")
-                    .WithFlavour("I believe in love at first shine")
+                    .WithFlavour("\"I believe in love at first shine\"")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1180,22 +1409,22 @@ namespace WildfrostTheGathering
                         {
                             SStack("Gain Attack On Treasure", 1),
                         };
-                        data.greetMessages = new string[6] { "I believe in love at first shine",
-                        "Skim all the gold and magic rocks you want, but if I see one greasy fingerprint on my new boots, you’ll be drinking bilgewater for a month",
-                        "Charge like a red-hot cannonball straight to your target. You slow down, you sink",
-                        "Just imagine what’s waiting around the bend. Adventure. Discovery. Riches for the taking. This is why I sail",
-                        "Opposable thumbs, opposable toes, prehensile tails, boundary issues … no treasure is safe from a goblin",
-                        "The best kind of treasure is the kind that leads to <i>more</i> treasure!"};
+                        data.greetMessages = new string[6] { "\"I believe in love at first shine\"",
+                        "\"Skim all the gold and magic rocks you want, but if I see one greasy fingerprint on my new boots, you’ll be drinking bilgewater for a month\"",
+                        "\"Charge like a red-hot cannonball straight to your target. You slow down, you sink\"",
+                        "\"Just imagine what’s waiting around the bend. Adventure. Discovery. Riches for the taking. This is why I sail\"",
+                        "\"Opposable thumbs, opposable toes, prehensile tails, boundary issues ... no treasure is safe from a goblin\"",
+                        "\"The best kind of treasure is the kind that leads to <i>more</i> treasure!\""};
                     })
                     );
 
                 // Academy Manufactor
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("academyManufactor", "Academy Manufactor")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
+                    .SetSprites("academy-manufactor-cwhite.png", "dragon-lord-bg.png")
                     .SetStats(4, 1, 0)
                     .WithCardType("Friendly")
-                    .WithFlavour("Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold")
+                    .WithFlavour("<i>Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1208,18 +1437,18 @@ namespace WildfrostTheGathering
                         {
                             TStack("Draw", 1)
                         };
-                        data.greetMessages = new string[2] { "Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold",
-                        "It shapes wonders beyond our wildest dreams\nLike sandwiches"};
+                        data.greetMessages = new string[2] { "<i>Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold</i>",
+                        "<i>It shapes wonders beyond our wildest dreams</i>\n<i>Like sandwiches!</i>"};
                     })
                     );
 
                 // Glorybringer
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("glorybringer", "Glorybringer")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(4, 3, 3)
+                    .SetSprites("glorybringer-sburley.png", "dragon-lord-bg.png")
+                    .SetStats(5, 3, 3)
                     .WithCardType("Friendly")
-                    .WithFlavour("What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion")
+                    .WithFlavour("<i>What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1233,17 +1462,17 @@ namespace WildfrostTheGathering
                         {
                             SStack("On Hit Equal Damage to Front Enemy", 1),
                         };
-                        data.greetMessages = new string[1] { "What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion" };
+                        data.greetMessages = new string[1] { "<i>What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion</i>" };
                     })
                     );
 
                 // Earthquake Dragon
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("earthquakeDragon", "Earthquake Dragon")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(10, 10, 10)
+                    .SetSprites("earthquake-dragon-jgrenier.png", "dragon-lord-bg.png")
+                    .SetStats(10, 10, 8)
                     .WithCardType("Friendly")
-                    .WithFlavour("An empire can take centuries to build but mere moments to destroy")
+                    .WithFlavour("<i>An empire can take centuries to build but mere moments to destroy</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1256,17 +1485,17 @@ namespace WildfrostTheGathering
                         {
                             SStack("While Active Reduce Counter By Allies With Flying", 2),
                         };
-                        data.greetMessages = new string[2] { "An empire can take centuries to build but mere moments to destroy", "*The ground rumbles beneath your feet*" };
+                        data.greetMessages = new string[2] { "<i>An empire can take centuries to build but mere moments to destroy</i>", "*The ground rumbles beneath your feet*" };
                     })
                     );
 
                 // Ojutai, Soul of Winter
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("ojutaiSoulOfWinter", "Ojutai, Soul of Winter")
-                    .SetSprites("dragon-lord.png", "dragon-lord-bg.png")
-                    .SetStats(6, 2, 4)
+                    .SetSprites("ojutai-soul-of-winter-cstone.png", "dragon-lord-bg.png")
+                    .SetStats(9, 2, 4)
                     .WithCardType("Friendly")
-                    .WithFlavour("\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"")
+                    .WithFlavour("<i>\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"</i>")
                     .WithValue(45)
                     .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
@@ -1277,9 +1506,76 @@ namespace WildfrostTheGathering
                         };
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
-                            SStack("While Active Reduce Counter By Allies With Flying", 2),
+                            SStack("On Card Played Apply Snow To Random Enemy", 1),
                         };
-                        data.greetMessages = new string[1] { "\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"" };
+                        data.greetMessages = new string[1] { "<i>\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"</i>" };
+                    })
+                    );
+
+                // Professional Face-Breaker
+                assets.Add(
+                    new CardDataBuilder(this).CreateUnit("professionalFaceBreaker", "Professional Face-Breaker")
+                    .SetSprites("professional-face-breaker-dscott.png", "dragon-lord-bg.png")
+                    .SetStats(5, 2, 3)
+                    .WithCardType("Friendly")
+                    .WithFlavour("<i>When you lose <b>Jetmir's</b> trust, his family makes sure you lose everything else</i>")
+                    .WithValue(45)
+                    .AddPool("MagicUnitPool")
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("On Card Played Destroy Right Treasure In Hand And Draw", 1),
+                            SStack("MultiHit", 1),
+                        };
+                        data.greetMessages = new string[1] { "<i>When you lose <b>Jetmir's</b> trust, his family makes sure you lose everything else</i>" };
+                    })
+                    );
+
+                // Shivan Dragon
+                assets.Add(
+                    new CardDataBuilder(this).CreateUnit("shivanDragon", "Shivan Dragon")
+                    .SetSprites("shivan-dragon-dgiancola.png", "dragon-lord-bg.png")
+                    .SetStats(7, 4, 3)
+                    .WithCardType("Friendly")
+                    .WithFlavour("<i>The undisputed master of the mountains of Shiv</i>")
+                    .WithValue(45)
+                    .AddPool("MagicUnitPool")
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Pre Turn Count Zoomlin In Hand & Gain Spice For Each", 1),
+                        };
+                        data.traits = new List<CardData.TraitStacks>()
+                        {
+                            TStack("Flying", 1),
+                        };
+                        data.greetMessages = new string[2] { "<b>*Breathes Fire Loudly*</b>\n<i>How was it stuck in ice?</i>",
+                            "<i>The undisputed master of the mountains of Shiv</i>"};
+                    })
+                    );
+
+                // Manaform Hellkite
+                assets.Add(
+                    new CardDataBuilder(this).CreateUnit("manaformHellkite", "Manaform Hellkite")
+                    .SetSprites("manaform-hellkite-amar.png", "dragon-lord-bg.png")
+                    .SetStats(5, 2, 4)
+                    .WithCardType("Friendly")
+                    .WithFlavour("<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic<i>")
+                    .WithValue(45)
+                    .AddPool("MagicUnitPool")
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Summon Dragon Token On Item Played", 1),
+                        };
+                        data.traits = new List<CardData.TraitStacks>()
+                        {
+                            TStack("Flying", 1),
+                        };
+                        data.greetMessages = new string[1] { "<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic</i>" };
                     })
                     );
 
