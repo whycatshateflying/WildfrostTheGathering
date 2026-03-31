@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using TMPro;
 using Unity.IO.LowLevel.Unsafe;
 using UnityEngine;
+using static Names;
 using static Steamworks.InventoryItem;
 
 namespace WildfrostTheGathering
@@ -165,6 +166,90 @@ namespace WildfrostTheGathering
                 {
                     targets.Add(entity2);
                 }
+            }
+        }
+
+        // Random Enemy for each card with Zoomlin in hand, up to 6
+        // TODO: make the aimless arrows show up ;_; (check discord logs on 3/30/26 in mod-development to see what I've done)
+        public class TargetModeFireball : TargetMode
+        {
+            public TargetConstraint[] constraints;
+            public override bool TargetRow => false;
+            public override bool NeedsTarget => false;
+            public override bool Random => false;
+            public override Entity[] GetPotentialTargets(Entity entity, Entity target, CardContainer targetContainer)
+            {
+                int numZoomlins = GetNumZoomlins();
+                if (numZoomlins == 0)
+                {
+                    return null;
+                }
+
+                HashSet<Entity> hashSet = new HashSet<Entity>();
+                hashSet.AddRange(from e in entity.GetAllEnemies()
+                                 where (bool)e && e.enabled && e.alive && e.canBeHit && CheckConstraints(e)
+                                 select e);
+                if (hashSet.Count <= 0)
+                {
+                    return null;
+                }
+                foreach (Entity entity1 in hashSet.ToArray())
+                {
+                    Debug.Log("[WildfrostTheGathering] " + entity1.name);
+                }
+                return hashSet.ToArray();
+            }
+
+            public override Entity[] GetTargets(Entity entity, Entity target, CardContainer targetContainer)
+            {
+                int numZoomlins = GetNumZoomlins();
+                List<Entity> potentialTargets = GetPotentialTargets(entity, target, targetContainer)?.ToList<Entity>()?.Clone();
+                if (potentialTargets == null)
+                {
+                    return null;
+                }
+
+                List<Entity> newTargets = potentialTargets.TakeRandom(numZoomlins)?.ToList<Entity>()?.Clone();
+
+                if (newTargets.Count <= 0)
+                {
+                    return null;
+                }
+
+                return newTargets.ToArray();
+            }
+            public override Entity[] GetSubsequentTargets(Entity entity, Entity target, CardContainer targetContainer)
+            {
+                return GetPotentialTargets(entity, target, targetContainer);
+            }
+            public bool CheckConstraints(Entity target)
+            {
+                TargetConstraint[] array = constraints;
+                if (array != null && array.Length > 0)
+                {
+                    return constraints.All((TargetConstraint c) => c.Check(target));
+                }
+
+                return true;
+            }
+
+            private int GetNumZoomlins()
+            {
+                int sum = 0;
+                foreach (Entity card in References.Player.handContainer)
+                {
+                    // Debug.Log("[WildfrostTheGathering] " + card.name + " is in hand");
+                    foreach (Entity.TraitStacks trait in card.traits)
+                    {
+                        // Debug.Log("[WildfrostTheGathering] " + trait.data.name);
+                        if (trait.data.name.Equals("Zoomlin"))
+                        {
+                            sum++;
+                            break;
+                        }
+                    }
+                }
+                return sum;
             }
         }
 
@@ -343,6 +428,7 @@ namespace WildfrostTheGathering
         // Apply X on certain card played. Taken from Abigail's AbsentAvalanche mod directly. (then modified for # of times code) Thank you! :3
         public class StatusEffectApplyXOnCertainCardPlayed : StatusEffectApplyXOnCardPlayed
         {
+            public bool whileActive = false;
             public int allowedTimes = 0;
             public int numTimesPlayed = 0;
             public bool hasAttack = false;
@@ -364,6 +450,11 @@ namespace WildfrostTheGathering
             public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
             {
                 // Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn");
+                if (whileActive && !Battle.IsOnBoard(target))
+                {
+                    // Debug.Log("[WildfrostTheGathering] ...but I'm not active yet");
+                    return false;
+                }
                 if (allowedTimes > 0 && numTimesPlayed++ > allowedTimes)
                 {
                     // Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
@@ -771,6 +862,80 @@ namespace WildfrostTheGathering
             }
         }
 
+        public class StatusEffectBonusDamageEqualToCardsWithTrait : StatusEffectBonusDamageEqualToCards
+        {
+            public bool doCheckName = false;
+            public TraitData checkTrait;
+            public override void Init()
+            {
+                base.PreCardPlayed += GainTrait;
+            }
+            public IEnumerator GainTrait(Entity entity, Entity[] targets)
+            {
+                int num = CountTrait();
+                if (num > 0)
+                {
+                    currentAmount = num;
+                    target.tempDamage += currentAmount;
+                    target.PromptUpdate();
+                    if (ping)
+                    {
+                        target.curveAnimator?.Ping();
+                        yield return Sequences.Wait(0.5f);
+                    }
+                }
+            }
+            public int CountTrait()
+            {
+                return 0 + (inHand ? CountInHandTrait() : 0) + (onBoard ? CountOnBoardTrait() : 0);
+            }
+            public int CountInHandTrait()
+            {
+                CardContainer handContainer = References.Player.handContainer;
+                if (!(bool)handContainer)
+                {
+                    return 0;
+                }
+
+                int num = 0;
+                foreach (Entity entity in handContainer)
+                {
+                    if (!doCheckName || entity.name.Equals(cardName) && (includeSelf || entity != target))
+                    {
+                        foreach (Entity.TraitStacks trait in entity.traits)
+                        {
+                            if (trait.data.name.Equals(checkTrait.name))
+                            {
+                                num++;
+                                break;
+                            }
+                        }
+                    }
+                }
+                return num;
+            }
+
+            public int CountOnBoardTrait()
+            {
+                int num = 0;
+                foreach (Entity entity in Battle.GetAllUnits())
+                {
+                    if (!doCheckName || entity.name.Equals(cardName) && (includeSelf || entity != target))
+                    {
+                        foreach (Entity.TraitStacks trait in entity.traits)
+                        {
+                            if (trait.data.name.Equals(checkTrait.name))
+                            {
+                                num++;
+                                break;
+                            }
+                        }
+                    }
+                }
+                return num;
+            }
+        }
+
         // TODO: Make flying and other targeting modes override each other visually
         private void CreateModAssets()
         {
@@ -907,6 +1072,7 @@ namespace WildfrostTheGathering
                         .Create<StatusEffectOngoingCounter>("Ongoing Decrease Counter")
                         .WithStackable(false)
                         .WithCanBeBoosted(false)
+                        .WithOffensive(true)  // For blank mask shenanigans... so it doesn't get copied
                         .SubscribeToAfterAllBuildEvent<StatusEffectOngoingCounter>(data =>
                         {
                             data.reverse = true;
@@ -1094,8 +1260,8 @@ namespace WildfrostTheGathering
                             ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                             scriptAmount.allies = true;
                             scriptAmount.hasTrait = TryGet<TraitData>("Flying");
-                            data.applyEqualAmount = true;
                             data.scriptableAmount = scriptAmount;
+                            data.applyEqualAmount = true;
                             data.effectToApply = TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter Stackable");
                             data.affectsSelf = true;
                             data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
@@ -1115,6 +1281,7 @@ namespace WildfrostTheGathering
                             data.countsSelf = true;
                             data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
                             data.effectToApply = TryGet<StatusEffectSnow>("Snow");
+                            data.whileActive = true;
                         })
                         );
 
@@ -1443,6 +1610,28 @@ namespace WildfrostTheGathering
                         })
                         );
 
+                    // Fireball: damage equal to zoomlined cards
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectBonusDamageEqualToCardsWithTrait>("Bonus Damage Equal To Zoomlin In Hand")
+                        .WithText("Deal additional damage equal to the number of cards with <keyword=zoomlin> in hand")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectBonusDamageEqualToCardsWithTrait>(data =>
+                        {
+                            data.doCheckName = false;
+                            data.checkTrait = TryGet<TraitData>("Zoomlin");
+                        })
+                        );
+
+                    /* (unused) Change the target mode to fireball
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectChangeTargetMode>("Random Enemy For Zoomlin")
+                        .SubscribeToAfterAllBuildEvent<StatusEffectChangeTargetMode>(data =>
+                        {
+                            data.targetMode = new Scriptable<TargetModeFireball>();
+                        })
+                        );*/
+
                 }  // Item Effects
             }  // Effects
 
@@ -1641,9 +1830,9 @@ namespace WildfrostTheGathering
                             SStack("Gain Attack On Treasure", 1),
                         };
                         data.greetMessages = new string[6] { "\"I believe in love at first shine\"",
-                        "\"Skim all the gold and magic rocks you want, but if I see one greasy fingerprint on my new boots, you’ll be drinking bilgewater for a month\"",
+                        "\"Skim all the gold and magic rocks you want, but if I see one greasy fingerprint on my new boots, you'll be drinking bilgewater for a month\"",
                         "\"Charge like a red-hot cannonball straight to your target. You slow down, you sink\"",
-                        "\"Just imagine what’s waiting around the bend. Adventure. Discovery. Riches for the taking. This is why I sail\"",
+                        "\"Just imagine what's waiting around the bend. Adventure. Discovery. Riches for the taking. This is why I sail\"",
                         "\"Opposable thumbs, opposable toes, prehensile tails, boundary issues ... no treasure is safe from a goblin\"",
                         "\"The best kind of treasure is the kind that leads to <i>more</i> treasure!\""};
                     })
@@ -1847,11 +2036,11 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Dragon's Fire (no art!)
+                // Dragon's Fire
                 assets.Add(
                     new CardDataBuilder(this)
                     .CreateItem("dragonsFire", "Dragon's Fire")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("dragons-fire-cwhite.png", "item-bg.png")
                     .WithText("Trigger a <keyword=whycats.wildfrost.wildfrostthegathering.flying> ally")
                     .SetDamage(2)
                     .WithCardType("Item")
@@ -1875,21 +2064,21 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Delayed Blast Fireball (no art!)
+                // Delayed Blast Fireball
                 assets.Add(
                     new CardDataBuilder(this)
                     .CreateItem("delayedBlastFireball", "Delayed Blast Fireball")
                     .SetDamage(3)
                     .WithCardType("Item")
                     .WithFlavour("The spell will fall upon a crowd like a dragon, ancient and full of death")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("delayed-blast-fireball-azafiratos.png", "item-bg.png")
                     .WithPools("GeneralItemPool")
                     .WithValue(50)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
-                            SStack("On Card Played Clear Own Spice", 1),
+                            // SStack("On Card Played Clear Own Spice", 1), If I ever learn to order events. bleh.
                             SStack("On Card Played Apply Spice To Self", 3),
                         };
                         data.traits = new List<CardData.TraitStacks>()
@@ -1899,11 +2088,11 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Spit Flame (no art!)
+                // Spit Flame
                 assets.Add(
                     new CardDataBuilder(this)
                     .CreateItem("spitFlame", "Spit Flame")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("spit-flame-crahn.png", "item-bg.png")
                     .SetDamage(2)
                     .WithCardType("Item")
                     .WithFlavour("\"Spread out, you idiots! Spread out!\"\n—<b>Marsden, party leader</b>, last words")
@@ -1919,11 +2108,11 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Draconic Lore (no art!)
+                // Draconic Lore
                 assets.Add(
                     new CardDataBuilder(this)
                     .CreateItem("draconicLore", "Draconic Lore")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("draconic-lore-tbabbey.png", "item-bg.png")
                     .SetDamage(null)
                     .WithCardType("Item")
                     .WithFlavour("The wyrmling studied the ancient carvings and dreamed of a day when her own exploits would be immortalized in stone")
@@ -1943,11 +2132,11 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Lofty Denial (no art!)
+                // Lofty Denial
                 assets.Add(
                     new CardDataBuilder(this)
                     .CreateItem("loftyDenial", "Lofty Denial")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("lofty-denial-mcastanon.png", "item-bg.png")
                     .SetDamage(0)
                     .WithCardType("Item")
                     .WithFlavour("\"As one, nature lifts its voice to tell you this: \'No.\'\"")
@@ -1966,11 +2155,10 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Spell Swindle (no art!)
-                assets.Add(
-                    new CardDataBuilder(this)
+                // Spell Swindle 
+                assets.Add(new CardDataBuilder(this)
                     .CreateItem("spellSwindle", "Spell Swindle")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("spell-swindle-vaminguez.png", "item-bg.png")
                     .SetDamage(0)
                     .WithCardType("Item")
                     .WithFlavour("Honesty is the first casualty of war")
@@ -1986,6 +2174,28 @@ namespace WildfrostTheGathering
                     })
                     );
 
+                // Fireball 
+                assets.Add(new CardDataBuilder(this)
+                    .CreateItem("fireball", "Fireball")
+                    .SetSprites("fireball-mtedin.png", "item-bg.png")
+                    .SetDamage(2)
+                    .WithCardType("Item")
+                    .WithFlavour("Burning something is easy. Choosing a target can be more difficult")
+                    .WithPools("GeneralItemPool")
+                    .WithValue(40)  // Base price in shop: +-6
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Bonus Damage Equal To Zoomlin In Hand", 1)
+                        };
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Barrage", 1)
+                        };
+                    })
+                    );
+
             }  // Items
 
             {  // Keywords
@@ -1997,6 +2207,18 @@ namespace WildfrostTheGathering
                     .WithTitle("Flying")  // The in-game name for the upgrade.
                     .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
                     .WithDescription("Always hits an enemy boss, if applicable|Hits normally if there are none") //Format is body|note.
+                    .WithCanStack(false)  // The keyword does not show its stack number.
+                    );
+
+                // Fireball targeting mode
+                assets.Add(
+                    new KeywordDataBuilder(this)
+                    .Create("fireball")
+                    .WithTitle("Hits an enemy for each card with Zoomlin in hand")  // The in-game name for the upgrade.
+                    .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                    .WithShow(false)
+                    //.WithShowIcon(false)
+                    .WithDescription("Hits an enemy for each card with Zoomlin in hand|Hits none if there are none") //Format is body|note.
                     .WithCanStack(false)  // The keyword does not show its stack number.
                     );
 
@@ -2023,6 +2245,18 @@ namespace WildfrostTheGathering
                     {
                         trait.keyword = Get<KeywordData>("flying");
                         trait.effects = new StatusEffectData[] { Get<StatusEffectData>("Prioritize Bosses") };
+                    })
+                    );
+
+                // Fireball
+                assets.Add(
+                    new TraitDataBuilder(this)
+                    .Create("Fireball")
+                    .WithOverrides(Get<TraitData>("Aimless"), Get<TraitData>("Longshot"), Get<TraitData>("Barrage"), Get<TraitData>("Flying"))
+                    .SubscribeToAfterAllBuildEvent((trait) =>
+                    {
+                        trait.keyword = Get<KeywordData>("fireball");
+                        trait.effects = new StatusEffectData[] { Get<StatusEffectData>("Random Enemy For Zoomlin") };
                     })
                     );
 
