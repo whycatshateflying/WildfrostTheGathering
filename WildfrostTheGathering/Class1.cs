@@ -169,14 +169,13 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Random Enemy for each card with Zoomlin in hand, up to 6
-        // TODO: make the aimless arrows show up ;_; (check discord logs on 3/30/26 in mod-development to see what I've done)
+        // Random Enemy for each card with Zoomlin in hand, up to 6. (Can't realistically be used on items cause no aimless boxes)
         public class TargetModeFireball : TargetMode
         {
             public TargetConstraint[] constraints;
             public override bool TargetRow => false;
             public override bool NeedsTarget => false;
-            public override bool Random => false;
+            public override bool Random => true;
             public override Entity[] GetPotentialTargets(Entity entity, Entity target, CardContainer targetContainer)
             {
                 int numZoomlins = GetNumZoomlins();
@@ -602,13 +601,13 @@ namespace WildfrostTheGathering
                 if (allies)
                 {
                     List<Entity> allies = entity.GetAllies();
-                    num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                    num += allies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                 }
 
                 if (enemies)
                 {
                     List<Entity> enemies = entity.GetEnemies();
-                    num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                    num += enemies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                 }
                 return num;
             }
@@ -621,13 +620,13 @@ namespace WildfrostTheGathering
                     if (allies)
                     {
                         List<Entity> allies = entity.GetAlliesInRow(rowIndex);
-                        num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                        num += allies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                     }
 
                     if (enemies)
                     {
                         List<Entity> enemies = entity.GetEnemiesInRow(rowIndex);
-                        num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                        num += enemies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                     }
                 }
                 return num;
@@ -655,6 +654,20 @@ namespace WildfrostTheGathering
             public override int Get(Entity entity)
             {
                 return custom;
+            }
+        }
+
+        // For when you need to count the number of targets with a trait or type in hand
+        public class ScriptableTargetsInHand : ScriptableAmount
+        {
+            public CardType cardType;
+            public TraitData hasTrait;
+            public override int Get(Entity entity)
+            {
+                int num = 0;
+                List<Entity> cardsInHand = References.Player.handContainer.ToList();
+                num += cardsInHand.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                return num;
             }
         }
 
@@ -828,40 +841,6 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Target Constraint is true only if there are 2 on board with the required features
-        public class TargetConstraintIsFeatureOnBoard : TargetConstraint
-        {
-            public int requiredAmount;
-            public bool allies;
-            public bool enemies;
-            public CardType cardType;
-            public TraitData hasTrait;
-
-            public override bool Check(Entity target)
-            {
-                int num = 0;
-                if (allies)
-                {
-                    List<Entity> allies = target.GetAllies();
-                    num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
-                }
-
-                if (enemies)
-                {
-                    List<Entity> enemies = target.GetEnemies();
-                    num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
-                }
-                Debug.Log("[WildfrostTheGathering] TargetConstraintIsFeatureOnBoard was called for " + target.name + ". Num was " + num);
-                return (num >= requiredAmount);
-            }
-
-            public override bool Check(CardData targetData)
-            {
-                Debug.Log("[WildfrostTheGathering] TargetConstraintIsFeatureOnBoard was called for cardData on " + targetData.name + " :shrug:");
-                return false;
-            }
-        }
-
         public class StatusEffectBonusDamageEqualToCardsWithTrait : StatusEffectBonusDamageEqualToCards
         {
             public bool doCheckName = false;
@@ -933,6 +912,53 @@ namespace WildfrostTheGathering
                     }
                 }
                 return num;
+            }
+        }
+
+        // Target Constraint is true only if there are 2 on board with the required features
+        public class TargetConstraintIsFeatureOnBoard : TargetConstraint
+        {
+            public int requiredAmount;
+            public bool allies;
+            public bool enemies;
+            public CardType cardType;
+            public TraitData hasTrait;
+
+            public override bool Check(Entity target)
+            {
+                int num = 0;
+                if (allies)
+                {
+                    List<Entity> allies = target.GetAllies();
+                    num += allies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                }
+
+                if (enemies)
+                {
+                    List<Entity> enemies = target.GetEnemies();
+                    num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
+                }
+                Debug.Log("[WildfrostTheGathering] TargetConstraintIsFeatureOnBoard was called for " + target.name + ". Num was " + num);
+                return (num >= requiredAmount);
+            }
+
+            public override bool Check(CardData targetData)
+            {
+                Debug.Log("[WildfrostTheGathering] TargetConstraintIsFeatureOnBoard was called for cardData on " + targetData.name + " :shrug:");
+                return false;
+            }
+        }
+
+        // Target Constraint is true only if the target is a leader
+        public class TargetConstraintIsLeader : TargetConstraint
+        {
+            public override bool Check(Entity target)
+            {
+                if (target.data.cardType.name.Equals("Leader"))
+                {
+                    return true;
+                }
+                return false;
             }
         }
 
@@ -1390,6 +1416,32 @@ namespace WildfrostTheGathering
                         })
                         );
 
+                    // Change the target mode to "fireball"
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectChangeTargetMode>("Random Enemy For Zoomlin")
+                        .SubscribeToAfterAllBuildEvent<StatusEffectChangeTargetMode>(data =>
+                        {
+                            data.targetMode = new Scriptable<TargetModeFireball>();
+                        })
+                        );
+
+                    // Voracious Hydra: When deployed, gain attack equal to zoomlined cards in hand
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenDeployed>("When Deployed Apply Attack And Health To Self Equal To Zoomlin")
+                        .WithText("When deployed, gain <keyword=attack> and <keyword=health> equal to cards with <keyword=zoomlin> in hand")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantMultiple>("Increase Attack & Health (No Constraints)");
+                            ScriptableTargetsInHand scriptAmount = ScriptableTargetsInHand.CreateInstance<ScriptableTargetsInHand>();
+                            scriptAmount.hasTrait = TryGet<TraitData>("Zoomlin");
+                            data.scriptableAmount = scriptAmount;
+                            data.applyEqualAmount = true;
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                        })
+                        );
+
                 }  // Companion Effects
 
                 {  // Item Effects
@@ -1623,16 +1675,21 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                    /* (unused) Change the target mode to fireball
-                    assets.Add(new StatusEffectDataBuilder(this)
-                        .Create<StatusEffectChangeTargetMode>("Random Enemy For Zoomlin")
-                        .SubscribeToAfterAllBuildEvent<StatusEffectChangeTargetMode>(data =>
-                        {
-                            data.targetMode = new Scriptable<TargetModeFireball>();
-                        })
-                        );*/
-
                 }  // Item Effects
+
+                {  // Clunker Effects
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenDestroyed>("When Destroyed Count Down Leader By X")
+                        .WithCanBeBoosted(true)
+                        .WithStackable(true)
+                        .WithText("When destroyed, count down your leader by <{a}>")
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
+                        })
+                        );
+                }  // Clunker Effects
             }  // Effects
 
             {  // Companions
@@ -1999,9 +2056,80 @@ namespace WildfrostTheGathering
                     })
                     );
 
+                // Voracious Hydra
+                assets.Add(
+                    new CardDataBuilder(this).CreateUnit("voraciousHydra", "Voracious Hydra")
+                    .SetSprites("voracious-hydra-wreynolds.png", "companion-bg.png")
+                    .SetStats(2, 1, 2)
+                    .WithCardType("Friendly")
+                    .WithFlavour("<i>Even baloths fear its feeding time<i>")
+                    .WithValue(45)
+                    .AddPool("MagicUnitPool")
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("When Deployed Apply Attack And Health To Self Equal To Zoomlin", 4),
+                        };
+                        data.traits = new List<CardData.TraitStacks>()
+                        {
+                            TStack("Fireball", 1),
+                        };
+                        data.greetMessages = new string[1] { "<i>Even baloths fear its feeding time</i>" };
+                    })
+                    );
+
             }  // Companions
 
             {  // Items
+
+                // Shock (no art!)
+                assets.Add(new CardDataBuilder(this)
+                        .CreateItem("shock", "Shock")
+                        .WithFlavour("\"The beauty of it is they never see it coming. Ever.\"\n<b>—Razzix, sparkmage</b>")
+                        .SetDamage(2)
+                        .SetSprites("placeholder-item.png", "item-bg.png")
+                        .WithValue(10)  // Base price in shop: 3-7
+                    );
+
+                // Cancel (no art!)
+                assets.Add(new CardDataBuilder(this)
+                    .CreateItem("cancel", "Cancel")
+                    .WithFlavour("\"Even the greatest inferno begins as a spark. And anyone can snuff out a spark.\"\n<b>—Chanyi, mistfire sage</b>")
+                    .SetDamage(0)
+                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .WithValue(30)  // Base price in shop: 19-31
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Zoomlin", 1)
+                        };
+                        data.attackEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Snow"), 3),
+                        };
+                    })
+                    );
+
+                // Swiftfoot Boots (no art!)
+                assets.Add(new CardDataBuilder(this)
+                    .CreateItem("swiftfootBoots", "Swiftfoot Boots")
+                    .SetDamage(null)
+                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .WithValue(50)  // Base price in shop: 35-55
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Combo", 1)
+                        };
+                        data.attackEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Reduce Counter"), 1),
+                        };
+                    })
+                    );
 
                 // Treasure
                 assets.Add(
@@ -2155,7 +2283,7 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Spell Swindle 
+                // Spell Swindle
                 assets.Add(new CardDataBuilder(this)
                     .CreateItem("spellSwindle", "Spell Swindle")
                     .SetSprites("spell-swindle-vaminguez.png", "item-bg.png")
@@ -2174,7 +2302,7 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Fireball 
+                // Fireball
                 assets.Add(new CardDataBuilder(this)
                     .CreateItem("fireball", "Fireball")
                     .SetSprites("fireball-mtedin.png", "item-bg.png")
@@ -2197,6 +2325,26 @@ namespace WildfrostTheGathering
                     );
 
             }  // Items
+
+            {  // Clunkers
+                // Sol Ring (no art!)
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("solRing", "Sol Ring")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("dragon-baby.png", "item-bg.png")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Scrap"), 1),
+                            SStack("When Destroyed Count Down Leader By X", 1),
+                        };
+                    })
+                    );
+
+            }  // Clunkers
 
             {  // Keywords
 
