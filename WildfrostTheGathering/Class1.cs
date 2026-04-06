@@ -2,6 +2,7 @@
 using AbsentAvalanche.Builders.Cards.Items;
 using AbsentAvalanche.StatusEffectImplementations;
 using Deadpan.Enums.Engine.Components.Modding;
+//using FMOD;
 using HarmonyLib;
 using NaughtyAttributes.Test;
 using System;
@@ -956,15 +957,108 @@ namespace WildfrostTheGathering
             {
                 if (target.data.cardType.name.Equals("Leader"))
                 {
-                    return true;
+                    return !not;
                 }
-                return false;
+                return not;
+            }
+        }
+
+        // Eternal implementation. Thank you semmie!
+        [HarmonyPatch(typeof(InjurySystem), nameof(InjurySystem.CanInjure), new Type[] {typeof(CardData)})]
+        class PatchNoInjury
+        {
+            static bool Prefix(ref CardData cardData, ref bool __result)
+            {
+                foreach (CardData.TraitStacks trait in cardData.traits)
+                {
+                    if (trait.data.name.Equals("whycats.wildfrost.wildfrostthegathering.Eternal"))
+                    {
+                        __result = false;
+                        return false;
+                    }
+                }
+                return true;
             }
         }
 
         // TODO: Make flying and other targeting modes override each other visually
+        // TODO: Make Sol Ring only effect leaders (give everyone an effect that says "if I'm a leader, count me down by 1" or maybe targetconstraint on an apply to all allies does work and it's easy)
         private void CreateModAssets()
         {
+
+            {  // Decks
+                assets.Add(TribeCopy("Basic", "Dragon")  // Snowdweller = "Basic", Shademancer = "Magic", Clunkmaster = "Clunk"
+                    .WithFlag("Images/dragon-deck-flag-sleeve.png")  // Loads your DrawFlag.png in your Images subfolder of your mod folder
+                    .WithSelectSfxEvent(FMODUnity.RuntimeManager.PathToEventReference("event:/sfx/inventory/backpack_opening"))  // The above line may need one of the FMOD references
+                    .SubscribeToAfterAllBuildEvent<ClassData>(data=>
+                    {
+                        data.leaders = DataList<CardData>("needleLeader", "muncherLeader", "Leader1_heal_on_kill");
+                        Inventory inventory = ScriptableObject.CreateInstance<Inventory>();
+                        inventory.deck.list = DataList<CardData>("shock", "shock", "shock", "shock", "cancel", "cancel", "swiftfootBoots", "solRing", "treasure").ToList();
+                        data.startingInventory = inventory;
+
+                        RewardPool unitPool = CreateRewardPool("DragonUnitPool", "Units", DataList<CardData>(
+                            "goldspanDragon", "ancientCopperDragon", "atsushiBlazingSky",
+                            "utvaraHellkite", "dragonlordsServant", "terrorOfThePeaks",
+                            "captainLanneryStorm", "academyManufactor", "glorybringer",
+                            "earthquakeDragon", "ojutaiSoulOfWinter", "professionalFaceBreaker", 
+                            "shivanDragon", "manaformHellkite", "voraciousHydra"));
+
+                        RewardPool itemPool = CreateRewardPool("DragonItemPool", "Items", DataList<CardData>(
+                            "treasure", "dragonsFire", "delayedBlastFireball", "spitFlame", "draconicLore",
+                            "loftyDenial", "spellSwindle", "fireball"));
+
+                        RewardPool charmPool = CreateRewardPool("DragonCharmPool", "Charms", DataList<CardUpgradeData>(
+                            "CardUpgradeSpice", "CardUpgradeEffigy",
+                            "CardUpgradeMime", "CardUpgradeShellBecomesSpice"));
+
+                        data.rewardPools = new RewardPool[]
+                        {
+                            unitPool,
+                            itemPool,
+                            charmPool,
+                            Extensions.GetRewardPool("GeneralUnitPool"),
+                            Extensions.GetRewardPool("GeneralItemPool"),
+                            Extensions.GetRewardPool("GeneralCharmPool"),
+                            Extensions.GetRewardPool("GeneralModifierPool"),
+                            Extensions.GetRewardPool("SnowUnitPool"),  // The snow pools are not Snowdwellers, there are general snow units/cards/charms
+                            Extensions.GetRewardPool("SnowItemPool"),
+                            Extensions.GetRewardPool("SnowCharmPool"),
+                        };
+                    })
+                    );
+
+                assets.Add(CardCopy("Ruckus", "needleLeader")
+                    .WithCardType("Leader")
+                    .FreeModify((data) =>  // data is assumed to be CardData. (use SubscribeToAfterAllBuildEvent whereever possible)
+                    {
+                        data.createScripts = new CardScript[]  // These scripts run when right before Events.OnCardDataCreated
+                        {
+                            GiveUpgrade(),  // Give a crown and make the stats vary by +- 2 or 1
+                            AddRandomHealth(-2,2),
+                            AddRandomDamage(-1,1),
+                            AddRandomCounter(-1,1)
+                        };
+                    })
+                    );
+
+                assets.Add(CardCopy("TrueFinalBoss6", "muncherLeader")
+                    .WithCardType("Leader")
+                    .SetStats(8, 5, 5)
+                    .FreeModify((data) =>
+                    {
+                        data.traits.Add(TStack("Draw", 1));  // Took a creative liberty here and made Frost Muncher draw a card on attack.
+                        data.createScripts = new CardScript[]
+                        {
+                            GiveUpgrade(),
+                            AddRandomHealth(-1,3),
+                            AddRandomDamage(0,2),
+                            AddRandomCounter(-1,1)
+                        };
+                    })
+                    );
+            }  // Decks
+
             {  // Effects
                 {  // Companion Effects
 
@@ -1577,25 +1671,6 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                    // Delayed Blast Fireball: Remove Spice
-                    assets.Add(new StatusEffectDataBuilder(this)
-                        .Create<StatusEffectInstantRemoveSpecificEffect>("Remove Spice")
-                        .SubscribeToAfterAllBuildEvent<StatusEffectInstantRemoveSpecificEffect>(data =>
-                        {
-                            data.effectToClean = "Spice";
-                        })
-                        );
-
-                    // Delayed Blast Fireball: Remove Spice From Self
-                    assets.Add(new StatusEffectDataBuilder(this)
-                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Clear Own Spice")
-                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
-                        {
-                            data.effectToApply = TryGet<StatusEffectInstantRemoveSpecificEffect>("Remove Spice");
-                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                        })
-                        );
-
                     // Gain Zoomlin when drawn if 2+ allies have Flying
                     assets.Add(new StatusEffectDataBuilder(this)
                         .Create<StatusEffectApplyXWhenDrawn>("Gain Zoomlin When Drawn If 2 Allies With Flying")
@@ -1675,9 +1750,38 @@ namespace WildfrostTheGathering
                         })
                         );
 
+                    // Shared Animosity: Apply Sice equal to Flying allies to all Flying allies
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("Apply Spice To Flying Allies Equal To Flying Allies")
+                        .WithText("Apply <keyword=spice> to Flying allies equal to the number of {0} allies")
+                        .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectSpice>("Spice");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.trait = TryGet<TraitData>("Flying");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                            };
+                            ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
+                            scriptAmount.allies = true;
+                            scriptAmount.hasTrait = TryGet<TraitData>("Flying");
+                            data.scriptableAmount = scriptAmount;
+                            data.applyEqualAmount = true;
+                        })
+                        );
+
                 }  // Item Effects
 
                 {  // Clunker Effects
+
+                    // Sol Ring: When destroyed, counter leader down by X
                     assets.Add(new StatusEffectDataBuilder(this)
                         .Create<StatusEffectApplyXWhenDestroyed>("When Destroyed Count Down Leader By X")
                         .WithCanBeBoosted(true)
@@ -1687,8 +1791,14 @@ namespace WildfrostTheGathering
                         {
                             data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                             data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintIsLeader>(),
+                            };
+                            data.targetMustBeAlive = false;
                         })
                         );
+
                 }  // Clunker Effects
             }  // Effects
 
@@ -1739,7 +1849,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>\"You see, most places have mice or mosquitoes...\"</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1764,7 +1873,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>You can never have enough gold</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1783,11 +1891,10 @@ namespace WildfrostTheGathering
                 assets.Add(
                     new CardDataBuilder(this).CreateUnit("atsushiBlazingSky", "Atsushi, the Blazing Sky")
                     .SetSprites("atsushi-blazing-sky-vaminguez.png", "companion-bg.png")
-                    .SetStats(7, 4, 3)
+                    .SetStats(7, 1, 3)
                     .WithCardType("Friendly")
                     .WithFlavour("<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1798,6 +1905,7 @@ namespace WildfrostTheGathering
                          data.traits = new List<CardData.TraitStacks>()
                         {
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
+                            TStack("Eternal", 1),
                         };
                         data.greetMessages = new string[3] { "<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>",
                             "<i><b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b></i>",
@@ -1813,7 +1921,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>The fear of dragons is as old and as powerful as the fear of death itself</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1836,7 +1943,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>The tastiest morsels rarely make it to their intended destination</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1856,7 +1962,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>If it comes for you, die boldly or die swiftly—for die you will</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1879,7 +1984,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("\"I believe in love at first shine\"")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1903,7 +2007,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -1927,7 +2030,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.traits = new List<CardData.TraitStacks>()
@@ -1951,7 +2053,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>An empire can take centuries to build but mere moments to destroy</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.traits = new List<CardData.TraitStacks>()
@@ -1974,7 +2075,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.traits = new List<CardData.TraitStacks>()
@@ -1997,7 +2097,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>When you lose <b>Jetmir's</b> trust, his family makes sure you lose everything else</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -2017,7 +2116,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>The undisputed master of the mountains of Shiv</i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -2041,7 +2139,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic<i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -2064,7 +2161,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Friendly")
                     .WithFlavour("<i>Even baloths fear its feeding time<i>")
                     .WithValue(45)
-                    .AddPool("MagicUnitPool")
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -2083,40 +2179,40 @@ namespace WildfrostTheGathering
 
             {  // Items
 
-                // Shock (no art!)
+                // Shock
                 assets.Add(new CardDataBuilder(this)
                         .CreateItem("shock", "Shock")
-                        .WithFlavour("\"The beauty of it is they never see it coming. Ever.\"\n<b>—Razzix, sparkmage</b>")
+                        .WithFlavour("\"The beauty of it is they never see it coming. Ever.\"\n<b>-Razzix, sparkmage</b>")
                         .SetDamage(2)
-                        .SetSprites("placeholder-item.png", "item-bg.png")
+                        .SetSprites("shock-jfoster.png", "item-bg.png")
                         .WithValue(10)  // Base price in shop: 3-7
                     );
 
-                // Cancel (no art!)
+                // Cancel
                 assets.Add(new CardDataBuilder(this)
                     .CreateItem("cancel", "Cancel")
-                    .WithFlavour("\"Even the greatest inferno begins as a spark. And anyone can snuff out a spark.\"\n<b>—Chanyi, mistfire sage</b>")
+                    .WithFlavour("\"Even the greatest inferno begins as a spark. And anyone can snuff out a spark.\"\n<b>-Chanyi, mistfire sage</b>")
                     .SetDamage(0)
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("cancel-dpalumb.png", "item-bg.png")
                     .WithValue(30)  // Base price in shop: 19-31
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.traits = new List<CardData.TraitStacks>
                         {
-                            TStack("Zoomlin", 1)
+                            TStack("Zoomlin", 1),
                         };
                         data.attackEffects = new CardData.StatusEffectStacks[]
                         {
-                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Snow"), 3),
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Snow"), 2),
                         };
                     })
                     );
 
-                // Swiftfoot Boots (no art!)
+                // Swiftfoot Boots
                 assets.Add(new CardDataBuilder(this)
                     .CreateItem("swiftfootBoots", "Swiftfoot Boots")
                     .SetDamage(null)
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetSprites("swiftfoot-boots-svelinov.png", "item-bg.png")
                     .WithValue(50)  // Base price in shop: 35-55
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2139,7 +2235,6 @@ namespace WildfrostTheGathering
                     .SetDamage(null)
                     .WithCardType("Item")
                     .WithFlavour("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-                    .WithPools("GeneralItemPool")
                     .WithValue(35)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2173,7 +2268,6 @@ namespace WildfrostTheGathering
                     .SetDamage(2)
                     .WithCardType("Item")
                     .WithFlavour("Very hot... It hurts to look")
-                    .WithPools("GeneralItemPool")
                     .WithValue(50)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2200,7 +2294,6 @@ namespace WildfrostTheGathering
                     .WithCardType("Item")
                     .WithFlavour("The spell will fall upon a crowd like a dragon, ancient and full of death")
                     .SetSprites("delayed-blast-fireball-azafiratos.png", "item-bg.png")
-                    .WithPools("GeneralItemPool")
                     .WithValue(50)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2224,7 +2317,6 @@ namespace WildfrostTheGathering
                     .SetDamage(2)
                     .WithCardType("Item")
                     .WithFlavour("\"Spread out, you idiots! Spread out!\"\n—<b>Marsden, party leader</b>, last words")
-                    .WithPools("GeneralItemPool")
                     .WithValue(50)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2244,7 +2336,6 @@ namespace WildfrostTheGathering
                     .SetDamage(null)
                     .WithCardType("Item")
                     .WithFlavour("The wyrmling studied the ancient carvings and dreamed of a day when her own exploits would be immortalized in stone")
-                    .WithPools("GeneralItemPool")
                     .WithValue(40)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2268,7 +2359,6 @@ namespace WildfrostTheGathering
                     .SetDamage(0)
                     .WithCardType("Item")
                     .WithFlavour("\"As one, nature lifts its voice to tell you this: \'No.\'\"")
-                    .WithPools("GeneralItemPool")
                     .WithValue(40)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2290,7 +2380,6 @@ namespace WildfrostTheGathering
                     .SetDamage(0)
                     .WithCardType("Item")
                     .WithFlavour("Honesty is the first casualty of war")
-                    .WithPools("GeneralItemPool")
                     .WithValue(40)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2306,33 +2395,53 @@ namespace WildfrostTheGathering
                 assets.Add(new CardDataBuilder(this)
                     .CreateItem("fireball", "Fireball")
                     .SetSprites("fireball-mtedin.png", "item-bg.png")
-                    .SetDamage(2)
+                    .SetDamage(1)
                     .WithCardType("Item")
                     .WithFlavour("Burning something is easy. Choosing a target can be more difficult")
-                    .WithPools("GeneralItemPool")
                     .WithValue(40)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
-                            SStack("Bonus Damage Equal To Zoomlin In Hand", 1)
+                            SStack("Bonus Damage Equal To Zoomlin In Hand", 1),
+                            SStack("MultiHit", 2)
                         };
                         data.traits = new List<CardData.TraitStacks>
                         {
-                            TStack("Barrage", 1)
+                            TStack("Aimless", 1)
                         };
+                    })
+                    );
+
+                // Shared Animosity (no art!)
+                assets.Add(
+                    new CardDataBuilder(this)
+                    .CreateItem("sharedAnimosity", "Shared Animosity")
+                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .SetDamage(null)
+                    .WithCardType("Item")
+                    .WithFlavour("\"It is the nature of souls that they burn more brightly together than apart.\"\n<b>—Vessifrus, flamekin demagogue</b>")
+                    .WithValue(40)  // Base price in shop: +-6
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Apply Spice To Flying Allies Equal To Flying Allies", 1),
+                        };
+                        data.needsTarget = false;
                     })
                     );
 
             }  // Items
 
             {  // Clunkers
-                // Sol Ring (no art!)
+
+                // Sol Ring
                 assets.Add(new CardDataBuilder(this)
                     .CreateUnit("solRing", "Sol Ring")
                     .WithCardType("Clunker")
                     .SetStats(null, null, 0)
-                    .SetSprites("dragon-baby.png", "item-bg.png")
+                    .SetSprites("sol-ring-mbierek.png", "clunker-bg.png")
                     .WithValue(50)
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2380,6 +2489,16 @@ namespace WildfrostTheGathering
                     .WithCanStack(false)  // The keyword does not show its stack number.
                     );
 
+                // Eternal
+                assets.Add(
+                    new KeywordDataBuilder(this)
+                    .Create("eternal")
+                    .WithTitle("Eternal")  // The in-game name for the upgrade.
+                    .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                    .WithDescription("Cannot be Injured") //Format is body|note.
+                    .WithCanStack(false)  // The keyword does not show its stack number.
+                    );
+
             }  // Keywords
 
             {  // Traits
@@ -2419,6 +2538,17 @@ namespace WildfrostTheGathering
                     })
                     );
 
+                // Eternal
+                assets.Add(
+                    new TraitDataBuilder(this)
+                    .Create("Eternal")
+                    .SubscribeToAfterAllBuildEvent((trait) =>
+                    {
+                        trait.keyword = TryGet<KeywordData>("eternal");
+                        trait.effects = new StatusEffectData[] { };
+                    })
+                    );
+
             }  // Traits
 
             {  // Charms
@@ -2430,6 +2560,16 @@ namespace WildfrostTheGathering
         {
             if (!preLoaded) { CreateModAssets(); }  // preLoaded makes sure that the builders are not made again on the 2nd load.
             base.Load();  // Actual loading and adding assets.
+            GameMode gameMode = TryGet<GameMode>("GameModeNormal");  // GameModeNormal is the standard game mode. 
+            gameMode.classes = gameMode.classes.Append(TryGet<ClassData>("Dragon")).ToArray();
+            Events.OnEntityCreated += FixImage;
+        }
+
+        // Show a tribe flag for leaders when selected
+        [HarmonyPatch(typeof(References), nameof(References.Classes), MethodType.Getter)]
+        static class FixClassesGetter
+        {
+            static void Postfix(ref ClassData[] __result) => __result = AddressableLoader.GetGroup<ClassData>("ClassData").ToArray();
         }
 
         // Thank you Hopeful for the loading/unloading/templates/tutorial/TryGet/AddAssets/help during the making of this mod
@@ -2451,7 +2591,11 @@ namespace WildfrostTheGathering
         public override void Unload()
         {
             base.Unload();
+
+            GameMode gameMode = TryGet<GameMode>("GameModeNormal");
+            gameMode.classes = RemoveNulls(gameMode.classes);  // Without this, a non-restarted game would crash on tribe selection
             UnloadFromClasses();
+            Events.OnEntityCreated -= FixImage;
         }
 
         public T TryGet<T>(string name) where T : DataFile
@@ -2470,6 +2614,15 @@ namespace WildfrostTheGathering
 
             return data;
         }
+        internal T[] RemoveNulls<T>(T[] data) where T : DataFile
+        {
+            List<T> list = data.ToList();
+            list.RemoveAll(x => x == null || x.ModAdded == this);
+            return list.ToArray();
+        }
+
+        // Helper methods/functions/data structures. Thank you Hopeful for all of these!
+        private T[] DataList<T>(params string[] names) where T : DataFile => names.Select((s) => TryGet<T>(s)).ToArray();
 
         public CardData.StatusEffectStacks SStack(string name, int amount) => new CardData.StatusEffectStacks(TryGet<StatusEffectData>(name), amount);
         public CardData.TraitStacks TStack(string name, int amount) => new CardData.TraitStacks(TryGet<TraitData>(name), amount);
@@ -2483,9 +2636,68 @@ namespace WildfrostTheGathering
             builder.Mod = this;
             return builder;
         }
+        private CardDataBuilder CardCopy(string oldName, string newName) => DataCopy<CardData, CardDataBuilder>(oldName, newName);
+        private ClassDataBuilder TribeCopy(string oldName, string newName) => DataCopy<ClassData, ClassDataBuilder>(oldName, newName);
 
+        private T DataCopy<Y, T>(string oldName, string newName) where Y : DataFile where T : DataFileBuilder<Y, T>, new()
+        {
+            Y data = Get<Y>(oldName).InstantiateKeepName();
+            data.name = GUID + "." + newName;
+            T builder = data.Edit<Y, T>();
+            builder.Mod = this;
+            return builder;
+        }
 
-        //Credits to Hopeful for this AddAssets code.
+        // For creating leaders
+        internal CardScript GiveUpgrade(string name = "Crown")  // Gives a crown by default
+        {
+            CardScriptGiveUpgrade script = ScriptableObject.CreateInstance<CardScriptGiveUpgrade>();  // This is the standard way of creating a ScriptableObject
+            script.name = $"Give {name}";  // Name only appears in the Unity Inspector. It has no other relevance beyond that.
+            script.upgradeData = TryGet<CardUpgradeData>(name);
+            return script;
+        }
+        internal CardScript AddRandomHealth(int min, int max)  // Boost health by a random amount
+        {
+            CardScriptAddRandomHealth health = ScriptableObject.CreateInstance<CardScriptAddRandomHealth>();
+            health.name = "Random Health";
+            health.healthRange = new Vector2Int(min, max);
+            return health;
+        }
+        internal CardScript AddRandomDamage(int min, int max)  // Boost damage by a ranom amount
+        {
+            CardScriptAddRandomDamage damage = ScriptableObject.CreateInstance<CardScriptAddRandomDamage>();
+            damage.name = "Give Damage";
+            damage.damageRange = new Vector2Int(min, max);
+            return damage;
+        }
+        internal CardScript AddRandomCounter(int min, int max)  // Increase counter by a random amount
+        {
+            CardScriptAddRandomCounter counter = ScriptableObject.CreateInstance<CardScriptAddRandomCounter>();
+            counter.name = "Give Counter";
+            counter.counterRange = new Vector2Int(min, max);
+            return counter;
+        }
+        
+        // To not break leader sprites
+        private void FixImage(Entity entity)
+        {
+            if (entity.display is Card card && !card.hasScriptableImage) //These cards should use the static image
+            {
+                card.mainImage.gameObject.SetActive(true);               //And this line turns them on
+            }
+        }
+
+        // To add a reward pool
+        private RewardPool CreateRewardPool(string name, string type, DataFile[] list)
+        {
+            RewardPool pool = ScriptableObject.CreateInstance<RewardPool>();
+            pool.name = name;
+            pool.type = type;  // The usual types are Units, Items, Charms, and Modifiers.
+            pool.list = list.ToList();
+            return pool;
+        }
+
+        // Credits to Hopeful for this AddAssets code.
         // AddAssets is called somewhere inside base.Load(). It is called multiple times for each DataFile type, with T being the DataFileBuilder of Y
         public override List<T> AddAssets<T, Y>()
         {
