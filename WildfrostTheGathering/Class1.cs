@@ -323,14 +323,20 @@ namespace WildfrostTheGathering
         // Only apply the deployed effect if the deployed has a certain trait (Thank you ME for BEING AWESOME and DOING IT MYSELF)
         public class StatusEffectApplyXWhenDeployedNoHandIfTrait : StatusEffectApplyXWhenDeployedNoHand
         {
-            public string wantedTrait;
+            public TraitData wantedTrait;
+            public List<CardData> excludedCards;
             public override bool RunCardMoveEvent(Entity entity)
             {
+                if (excludedCards.Count > 0 && excludedCards.Any(card => card.name.Equals(entity.name)))
+                {
+                    Debug.Log("[WTG] " + entity.name + " was in excluded cards");
+                    return false;
+                }
                 // Debug.Log("[WildfrostTheGathering] " + entity.name + " was added to play");
                 foreach (Entity.TraitStacks trait in entity.traits)
                 {
                     // Debug.Log("[WildfrostTheGathering] " + entity.name + " has trait " + trait.data.name);
-                    if (trait.data.name.Equals(wantedTrait))
+                    if (trait.data.name.Equals(wantedTrait.name))
                     {
                         // Debug.Log("[WildfrostTheGathering] returning base.RunCardMoveEvent");
                         return base.RunCardMoveEvent(entity);
@@ -349,6 +355,7 @@ namespace WildfrostTheGathering
             {
                 base.OnBegin += OnFirstAdd;
                 base.OnTurnEnd += RemoveOnTurnEnd;
+                base.OnEnable += RemoveWhenDrawn;
                 Events.OnBattleEnd += RemoveAfterBattle;
             }
 
@@ -360,39 +367,38 @@ namespace WildfrostTheGathering
                 target.data.canPlayOnFriendly = false;
                 target.data.canPlayOnHand = false;
                 target.data.playType = Card.PlayType.Play;
+                target.data.needsTarget = true;
                 return null;
             }
 
             public IEnumerator RemoveOnTurnEnd(Entity entity)
             {
-                target.data.canPlayOnBoard = target.data.original.canPlayOnBoard;
-                target.data.canPlayOnEnemy = target.data.original.canPlayOnEnemy;
-                target.data.canPlayOnFriendly = target.data.original.canPlayOnFriendly;
-                target.data.canPlayOnHand = target.data.original.canPlayOnHand;
-                target.data.playType = target.data.original.playType;
-                foreach (Entity.TraitStacks trait in target.traits.Clone())
-                {
-                    if (trait.data.name.Equals("whycats.wildfrost.wildfrostthegathering.Unplayable"))
-                    {
-                        Debug.Log("[WildfrostTheGathering] Unplayable found on " + target.data.name + "! Removing...");
-                        if (target.traits.Remove(trait))
-                        {
-                            target.display.promptUpdateDescription = true;
-                            target.PromptUpdate();
-                            break;
-                        }
-                    }
-                }
+                RemoveFromSelf();
                 yield return Remove();
             }
+            public IEnumerator RemoveWhenDrawn(Entity entity)
+            {
+                if (entity == target && target.InHand())
+                {
+                    RemoveFromSelf();
+                }
+                yield return null;
+            }
+
             public void RemoveAfterBattle()
             {
                 Debug.Log("[WildfrostTheGathering] Is this battle end?");
+                RemoveFromSelf();
+            }
+
+            private bool RemoveFromSelf()
+            {
                 target.data.canPlayOnBoard = target.data.original.canPlayOnBoard;
                 target.data.canPlayOnEnemy = target.data.original.canPlayOnEnemy;
                 target.data.canPlayOnFriendly = target.data.original.canPlayOnFriendly;
                 target.data.canPlayOnHand = target.data.original.canPlayOnHand;
                 target.data.playType = target.data.original.playType;
+                target.data.needsTarget = target.data.original.needsTarget;
                 foreach (Entity.TraitStacks trait in target.traits.Clone())
                 {
                     if (trait.data.name.Equals("whycats.wildfrost.wildfrostthegathering.Unplayable"))
@@ -402,10 +408,11 @@ namespace WildfrostTheGathering
                         {
                             target.display.promptUpdateDescription = true;
                             target.PromptUpdate();
-                            break;
+                            return true;
                         }
                     }
                 }
+                return false;
             }
         }
 
@@ -580,18 +587,63 @@ namespace WildfrostTheGathering
             }
         }
 
+        // Applies X equal to the count, each with a stack of 1 (I think, stack size is untested)
+        public class StatusEffectApplyXMultipleInstant : StatusEffectApplyX
+        {
+            public override bool Instant => true;
+
+            public override int GetAmount(Entity entity, bool equalAmount = false, int equalTo = 0)
+            {
+                if (!scriptableAmount)
+                {
+                    if (!equalAmount)
+                    {
+                        return GetAmount();
+                    }
+
+                    return equalTo;
+                }
+
+                return scriptableAmount.Get(entity);
+            }
+
+            public override int GetAmount()
+            {
+                return count;
+            }
+
+            public override bool TargetSilenced()
+            {
+                return false;
+            }
+
+            public override void Init()
+            {
+                base.OnBegin += Process;
+            }
+
+            public IEnumerator Process()
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    yield return Run(GetTargets(), 1);
+                }
+                yield return Remove();
+            }
+        }
+
         // Thank you again Abigail for the very yoinkable code! :3
         public class ScriptableTargetsOnBoard : ScriptableAmount
         {
             public bool allies;
             public bool enemies;
             public bool inRow = false;
+            public int mult = 1;
             public CardType cardType;
             public TraitData hasTrait;
 
             public override int Get(Entity entity)
             {
-                Debug.Log("[WildfrostTheGathering] Am I alive?");
                 int num = 0;
                 int[] rowIndices = References.Battle.GetRowIndices(entity);
                 if (inRow)
@@ -610,7 +662,7 @@ namespace WildfrostTheGathering
                     List<Entity> enemies = entity.GetEnemies();
                     num += enemies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                 }
-                return num;
+                return num * mult;
             }
 
             private int InRow(Entity entity, int[] rows)
@@ -645,16 +697,6 @@ namespace WildfrostTheGathering
                     return entity.counter.max;
                 }
                 return entity.counter.current;
-            }
-        }
-
-        // ScriptableAmount arbitrary cause I'm le stupid
-        public class ScriptableAmountAny : ScriptableAmount
-        {
-            public int custom = 0;
-            public override int Get(Entity entity)
-            {
-                return custom;
             }
         }
 
@@ -775,6 +817,186 @@ namespace WildfrostTheGathering
                         break;
                     }
                 }
+            }
+        }
+
+        // Cause while active ally behind is broken otherwise. Thanks While Active
+        public class StatusEffectWhileActiveXUpdatesOnOtherMove : StatusEffectWhileActiveX
+        {
+            public override IEnumerator CardMove(Entity entity)
+            {
+                // Literally just the old code but add a call to FindContainers
+                if (target == entity)
+                {
+                    yield return base.CardMove(entity);  // For code tidiness
+                }
+                else
+                {
+                    if (!active)
+                    {
+                        yield break;
+                    }
+
+                    if (AffectsSlot())
+                    {
+                        FindContainersClone();
+                        CardContainer[] other = containersToAffect.Select((CardContainer a) => a.Group).ToArray();
+                        if (entity.containers.ContainsAny(other) || entity.preContainers.ContainsAny(other))
+                        {
+                            yield return Deactivate();
+                            yield return Activate();
+                        }
+                    }
+                    else if (affected.Contains(entity))
+                    {
+                        if (!containersToAffect.ContainsAny(entity.containers))
+                        {
+                            yield return UnAffect(entity);
+                        }
+                    }
+                    else if (containersToAffect.ContainsAny(entity.containers))
+                    {
+                        yield return Affect(entity);
+                    }
+                }
+            }
+
+            public void FindContainersClone()
+            {
+                // containersToAffect.Clear();  // This breaks it for some reason... Other than that, no changes
+                Character opponent = Battle.GetOpponent(target.owner);
+                int[] rowIndices = Battle.instance.GetRowIndices(target);
+                affectsSelf = AppliesTo(ApplyToFlags.Self);
+                if (AppliesTo(ApplyToFlags.Allies))
+                {
+                    containersToAffect.AddRange(Battle.instance.GetRows(target.owner));
+                }
+                else if (AppliesTo(ApplyToFlags.AlliesInRow))
+                {
+                    int[] array = rowIndices;
+                    foreach (int rowIndex in array)
+                    {
+                        containersToAffect.Add(Battle.instance.GetRow(target.owner, rowIndex));
+                    }
+                }
+                else
+                {
+                    if (AppliesTo(ApplyToFlags.FrontAlly))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex2 in array)
+                        {
+                            if (Battle.instance.GetRow(target.owner, rowIndex2) is CardSlotLane cardSlotLane)
+                            {
+                                CardSlot value = cardSlotLane.slots.FirstOrDefault((CardSlot a) => !a.Empty);
+                                containersToAffect.AddIfNotNull(value);
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.BackAlly))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex3 in array)
+                        {
+                            if (Battle.instance.GetRow(target.owner, rowIndex3) is CardSlotLane cardSlotLane2)
+                            {
+                                CardSlot value2 = cardSlotLane2.slots.LastOrDefault((CardSlot a) => !a.Empty);
+                                containersToAffect.AddIfNotNull(value2);
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.AllyInFrontOf))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex4 in array)
+                        {
+                            if (!(Battle.instance.GetRow(target.owner, rowIndex4) is CardSlotLane cardSlotLane3))
+                            {
+                                continue;
+                            }
+
+                            for (int num = cardSlotLane3.IndexOf(target) - 1; num >= 0; num--)
+                            {
+                                CardSlot cardSlot = cardSlotLane3.slots[num];
+                                if (!cardSlot.Empty)
+                                {
+                                    containersToAffect.Add(cardSlot);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.AllyBehind))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex5 in array)
+                        {
+                            if (!(Battle.instance.GetRow(target.owner, rowIndex5) is CardSlotLane cardSlotLane4))
+                            {
+                                continue;
+                            }
+
+                            for (int num2 = cardSlotLane4.IndexOf(target) + 1; num2 < cardSlotLane4.slots.Count; num2++)
+                            {
+                                CardSlot cardSlot2 = cardSlotLane4.slots[num2];
+                                if (!cardSlot2.Empty)
+                                {
+                                    containersToAffect.Add(cardSlot2);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (AppliesTo(ApplyToFlags.Enemies))
+                {
+                    containersToAffect.AddRange(Battle.instance.GetRows(opponent));
+                }
+                else if (AppliesTo(ApplyToFlags.EnemiesInRow))
+                {
+                    int[] array = rowIndices;
+                    foreach (int rowIndex6 in array)
+                    {
+                        containersToAffect.Add(Battle.instance.GetRow(opponent, rowIndex6));
+                    }
+                }
+
+                if (AppliesTo(ApplyToFlags.Hand) && (bool)References.Player)
+                {
+                    containersToAffect.AddIfNotNull(References.Player.handContainer);
+                }
+
+                if (AppliesTo(ApplyToFlags.EnemyHand) && (bool)opponent)
+                {
+                    containersToAffect.AddIfNotNull(opponent.handContainer);
+                }
+            }
+        }
+
+        // If this is applied to a card, then it'll update whenever something that might happen does happen
+        public class StatusEffectApplyXOnCardPlayedUpdateDesc : StatusEffectApplyXOnCardPlayed
+        {
+            public override bool RunEndEvent()
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return false;
+            }
+            public override bool RunStackEvent(int stacks)
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return false;
+            }
+            public override bool RunActionPerformedEvent(PlayAction playAction)
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return false;
             }
         }
 
@@ -950,7 +1172,7 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Target Constraint is true only if the target is a leader
+        // Target Constraint is true only if the target is a leader (shut up I know I could use the miniboss check I even do that for treasure)
         public class TargetConstraintIsLeader : TargetConstraint
         {
             public override bool Check(Entity target)
@@ -960,6 +1182,32 @@ namespace WildfrostTheGathering
                     return !not;
                 }
                 return not;
+            }
+        }
+
+        // If the target has less than a certain amount of health
+        public class TargetConstraintHealthLessThan : TargetConstraint
+        {
+            public int value;
+            public bool allowNegative = false;
+            public override bool Check(Entity target)
+            {
+                if (target.hp.current >= value || (!allowNegative && target.hp.current < 1))
+                {
+                    return not;
+                }
+
+                return !not;
+            }
+
+            public override bool Check(CardData targetData)
+            {
+                if (targetData.hp >= value || (!allowNegative && targetData.hp < 1))
+                {
+                    return not;
+                }
+
+                return !not;
             }
         }
 
@@ -982,7 +1230,12 @@ namespace WildfrostTheGathering
         }
 
         // TODO: Make flying and other targeting modes override each other visually
-        // TODO: Make Sol Ring only effect leaders (give everyone an effect that says "if I'm a leader, count me down by 1" or maybe targetconstraint on an apply to all allies does work and it's easy)
+        // TODO: make zoomlin sound not play twice for treasures added to hand (if possible)
+        // TODO: Make Delayed Blast Fireball not clear all spice after played (if possible)
+        // TODO: Make beatable ascendeds
+        // TODO: Make Dragonlord's Servant stackable for the funnies
+        // TODO: Make mox jasper function when a card dies and moves up
+        // TODO: Make Manaform Hellkite not trigger on each hit of frenzy
         private void CreateModAssets()
         {
 
@@ -992,9 +1245,10 @@ namespace WildfrostTheGathering
                     .WithSelectSfxEvent(FMODUnity.RuntimeManager.PathToEventReference("event:/sfx/inventory/backpack_opening"))  // The above line may need one of the FMOD references
                     .SubscribeToAfterAllBuildEvent<ClassData>(data=>
                     {
-                        data.leaders = DataList<CardData>("needleLeader", "muncherLeader", "Leader1_heal_on_kill");
+                        string[] dragonDeckLeaders = new string[] { "miirymSentinelWyrmLeader", "theUrDragonLeader", "lathlissDragonQueenLeader" };
+                        data.leaders = DataList<CardData>(dragonDeckLeaders);
                         Inventory inventory = ScriptableObject.CreateInstance<Inventory>();
-                        inventory.deck.list = DataList<CardData>("shock", "shock", "shock", "shock", "cancel", "cancel", "swiftfootBoots", "solRing", "treasure").ToList();
+                        inventory.deck.list = DataList<CardData>("shock", "shock", "shock", "shock", "cancel", "cancel", "swiftfootBoots", "lotusPetal", "treasure").ToList();
                         data.startingInventory = inventory;
 
                         RewardPool unitPool = CreateRewardPool("DragonUnitPool", "Units", DataList<CardData>(
@@ -1006,7 +1260,10 @@ namespace WildfrostTheGathering
 
                         RewardPool itemPool = CreateRewardPool("DragonItemPool", "Items", DataList<CardData>(
                             "treasure", "dragonsFire", "delayedBlastFireball", "spitFlame", "draconicLore",
-                            "loftyDenial", "spellSwindle", "fireball"));
+                            "loftyDenial", "spellSwindle", "fireball", "sharedAnimosity", "bottleCapBlast", 
+                            "explosiveVegetation", "bootleggersStash", "temptingContract", "moxJasper",
+                            "ritesOfFlourishing", "gravitationalShift", "revelInRiches", "dragonsHoard", 
+                            "windcragSiege"));
 
                         RewardPool charmPool = CreateRewardPool("DragonCharmPool", "Charms", DataList<CardUpgradeData>(
                             "CardUpgradeSpice", "CardUpgradeEffigy",
@@ -1028,39 +1285,134 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                assets.Add(CardCopy("Ruckus", "needleLeader")
+                {  // Leaders
+
+                    // The Ur-Dragon
+                    assets.Add(
+                    new CardDataBuilder(this)
+                    .CreateUnit("theUrDragonLeader", "The Ur-Dragon", idleAnim: "GiantAnimationProfile")
                     .WithCardType("Leader")
-                    .FreeModify((data) =>  // data is assumed to be CardData. (use SubscribeToAfterAllBuildEvent whereever possible)
+                    .SetSprites("the-ur-dragon-jjones.png", "companion-bg.png")
+                    .SetStats(9, 5, 6)  // 8-10, 5-6, 6-7
+                    .WithFlavour("<i><b>*A dark shadow covers the area*</b></i>")
+                    .WithValue(25)
+                    .SubscribeToAfterAllBuildEvent(data =>
                     {
-                        data.createScripts = new CardScript[]  // These scripts run when right before Events.OnCardDataCreated
+                        data.traits = new List<CardData.TraitStacks>()
                         {
-                            GiveUpgrade(),  // Give a crown and make the stats vary by +- 2 or 1
-                            AddRandomHealth(-2,2),
-                            AddRandomDamage(-1,1),
-                            AddRandomCounter(-1,1)
+                            new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
+                            new CardData.TraitStacks(Get<TraitData>("Draw"), 2),  // 2
+                        };
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("While Active Zoomlin When Drawn To Flying Allies In Hand", 1)
+                        };
+                        data.greetMessages = new string[2] { "Source of all dragons across the multiverse, <b>The Ur-Dragon, Progenitor of Fire</b>, tears holes in the aether to travel",
+                                                            "<i><b>*A dark shadow covers the area*</b></i>"};
+                        data.createScripts = new CardScript[]
+                        {
+                            GiveUpgrade(),
+                            AddRandomHealth(-1,1),
+                            AddRandomDamage(0,1),
+                            AddRandomCounter(0, 1),
                         };
                     })
                     );
 
-                assets.Add(CardCopy("TrueFinalBoss6", "muncherLeader")
-                    .WithCardType("Leader")
-                    .SetStats(8, 5, 5)
-                    .FreeModify((data) =>
-                    {
-                        data.traits.Add(TStack("Draw", 1));  // Took a creative liberty here and made Frost Muncher draw a card on attack.
-                        data.createScripts = new CardScript[]
+                    // Miirym, Sentinel Wyrm
+                    assets.Add(
+                        new CardDataBuilder(this)
+                        .CreateUnit("miirymSentinelWyrmLeader", "Miirym, Sentinel Wyrm", idleAnim: "FloatAnimationProfile")
+                        .WithCardType("Leader")
+                        .SetSprites("miirym-sentinel-wyrm-kkotaki.png", "companion-bg.png")
+                        .SetStats(8, 3, 5)  // 8-9, 3-4, 5
+                        .WithFlavour("\"Do you have tales of the world outside? It\'s been so long since I've left Candlekeep\"")
+                        .WithValue(25)
+                        .SubscribeToAfterAllBuildEvent(data =>
                         {
-                            GiveUpgrade(),
-                            AddRandomHealth(-1,3),
-                            AddRandomDamage(0,2),
-                            AddRandomCounter(-1,1)
-                        };
-                    })
-                    );
+                            data.traits = new List<CardData.TraitStacks>()
+                            {
+                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
+                            };
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("On Card Played Summon Copy Of Ally Ahead With X Health And Fragile", 1)
+                            };
+                            data.greetMessages = new string[1] { "\"Do you have tales of the world outside? It's been so long since I've left <b>Candlekeep</b>\"" };
+                            data.createScripts = new CardScript[]
+                            {
+                                GiveUpgrade(),
+                                AddRandomHealth(0,1),
+                                AddRandomDamage(0,1),
+                            };
+                        })
+                        );
+
+                    // Lathliss, Dragon Queen
+                    assets.Add(
+                        new CardDataBuilder(this)
+                        .CreateUnit("lathlissDragonQueenLeader", "Lathliss, Dragon Queen", idleAnim: "ShakeAnimationProfile")
+                        .WithCardType("Leader")
+                        .SetSprites("lathliss-dragon-queen-akonstad.png", "companion-bg.png")
+                        .SetStats(7, 3, 4)  // 7-8, 3-4, 3-5
+                        .WithFlavour("\"Do you have tales of the world outside? It\'s been so long since I've left Candlekeep\"")
+                        .WithValue(25)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.traits = new List<CardData.TraitStacks>()
+                            {
+                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
+                            };
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("When Flying Ally Deployed Summon Dragon Token", 1)
+                            };
+                            data.greetMessages = new string[1] { "Sages whisper that <b>Lathliss</b> still keeps the heart of the old dragon queen sealed within a jewel, its smoldering warmth an eternal reminder that no monarch is untouchable." };
+                            data.createScripts = new CardScript[]
+                            {
+                                GiveUpgrade(),
+                                AddRandomHealth(0,1),
+                                AddRandomDamage(0,1),
+                                AddRandomCounter(-1,1)
+                            };
+                        })
+                        );
+
+                }  // Leaders
             }  // Decks
 
             {  // Effects
                 {  // Companion Effects
+
+                    // Wall of omens: When deployed draw 1
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenDeployed>("When Deployed Draw")
+                        .WithText("<keyword=draw> <{a}> when deployed")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                        })
+                        );
+
+                    // Juggernaut: take 1 damage
+                    assets.Add(new StatusEffectDataBuilder(this)
+                      .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Damage To Self")
+                      .WithText("Take <{a}> damage")
+                      .WithStackable(true)
+                      .WithCanBeBoosted(true)
+                      .WithDoesDamage(true)     // Its entity can activate "On kill" effects with this effect, eg for Bling Charm
+                      .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                      {
+                          data.desc = "Deal <{0}> damage to self and allies in the row";
+                          data.dealDamage = true;
+                          data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                          data.countsAsHit = true;
+                          data.doPing = false;
+                      })
+                      );
 
                     // Adding Treasure: Summon Treasure
                     assets.Add(new StatusEffectDataBuilder(this)
@@ -1126,7 +1478,7 @@ namespace WildfrostTheGathering
                     // Draw on destroy
                     assets.Add(new StatusEffectDataBuilder(this)
                             .Create<StatusEffectApplyXWhenDestroyed>("When Destroyed Draw")
-                            .WithText("When destroyed, draw <{a}>")
+                            .WithText("When destroyed, <Draw {a}>")
                             .WithStackable(true)
                             .WithCanBeBoosted(true)
                             .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
@@ -1153,6 +1505,19 @@ namespace WildfrostTheGathering
                             data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
                             data.setCardType = TryGet<CardType>("Summoned");
                             data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
+                        })
+                        );
+
+                    // Instant summon Dragon Token
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectInstantSummon>("Instant Summon Dragon Token")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                        {
+                            data.eventPriority = 99999;
+                            data.targetSummon = TryGet<StatusEffectSummon>("Summon Dragon Token");
+                            data.summonPosition = StatusEffectInstantSummon.Position.InFrontOfOrOtherRow;
                         })
                         );
 
@@ -1291,11 +1656,11 @@ namespace WildfrostTheGathering
                             data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                             data.whenSelfDeployed = false;
                             data.whenAllyDeployed = true;
-                            data.wantedTrait = "whycats.wildfrost.wildfrostthegathering.Flying";
+                            data.wantedTrait = TryGet<TraitData>("Flying");
                         })
                         );
 
-                    // Gain attack when Treasure is played
+                    // Captain Lannery Storm: Gain attack when Treasure is played
                     assets.Add(new StatusEffectDataBuilder(this)
                         .Create<StatusEffectApplyXOnCertainCardPlayed>("Gain Attack On Treasure")
                         .WithText("Gain <+{a}><keyword=attack> whenever a {0} is played")
@@ -1312,8 +1677,8 @@ namespace WildfrostTheGathering
 
                     // Trigger when Treasure is played
                     assets.Add(new StatusEffectDataBuilder(this)
-                        .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On Treasure")
-                        .WithText("Trigger whenever a {0} is played")
+                        .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On First Treasure")
+                        .WithText("Trigger the first time you play a {0} each turn")
                         .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
                         .WithStackable(true)
                         .WithCanBeBoosted(false)
@@ -1324,6 +1689,7 @@ namespace WildfrostTheGathering
                             data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                             data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                             data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
+                            data.allowedTimes = 1;
                         })
                         );
 
@@ -1455,10 +1821,10 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                    // Shivan Dragon: Count Zoomlin cards in hand and gain Spice
+                    // Shivan Dragon: Count Zoomlin cards in hand and gain Spice (I don't know why I did it this way leave me alone)
                     assets.Add(new StatusEffectDataBuilder(this)
                         .Create<StatusEffectApplyXPreTurn>("Pre Turn Count Zoomlin In Hand & Gain Spice For Each")
-                        .WithText("Before attacking, gain {a} <keyword=spice> for each card with <keyword=zoomlin> in hand")
+                        .WithText("Before attacking, gain <{a}> <keyword=spice> for each card with <keyword=zoomlin> in hand")
                         .WithStackable(true)
                         .WithCanBeBoosted(true)
                         .SubscribeToAfterAllBuildEvent<StatusEffectApplyXPreTurn>(data =>
@@ -1536,7 +1902,7 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                }  // Companion Effects
+                }  // Companion Effects 
 
                 {  // Item Effects
 
@@ -1565,17 +1931,13 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                    // Treasure: Add Zoomlin to a card in hand (attack effect)
+                    // Treasure: Add Zoomlin to self
                     assets.Add(new StatusEffectDataBuilder(this)
                         .Create<StatusEffectApplyXInstant>("Instant Gain Zoomlin (To Card In Hand)")
                         .WithText("Add {0} to a card in your hand")
                         .WithTextInsert("<keyword=zoomlin>")
                         .WithStackable(false)
                         .WithCanBeBoosted(false)
-                        .WithOffensive(false)
-                        .WithMakesOffensive(false)
-                        .WithDoesDamage(false)
-                        .WithType("")
                         .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                         {
                             data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
@@ -1583,28 +1945,28 @@ namespace WildfrostTheGathering
 
                             data.targetConstraints = new TargetConstraint[]
                             {
-                        new Scriptable<TargetConstraintHasTrait>(tcht =>
-                        {
-                            tcht.not = true;
-                            tcht.trait = TryGet<TraitData>("Noomlin");
-                            tcht.ignoreSilenced = false;
-                        }),
-                            new Scriptable<TargetConstraintHasStatus>(tchs =>
-                        {
-                            tchs.not = true;
-                            tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
-                        }),
-                        new Scriptable<TargetConstraintHasTrait>(tcht =>
-                        {
-                            tcht.not = true;
-                            tcht.trait = TryGet<TraitData>("Zoomlin");
-                            tcht.ignoreSilenced = false;
-                        }),
-                            new Scriptable<TargetConstraintHasStatus>(tchs =>
-                        {
-                            tchs.not = true;
-                            tchs.status = TryGet<StatusEffectFreeAction>("Free Action (Zoomlin)");
-                        }),
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.not = true;
+                                    tcht.trait = TryGet<TraitData>("Noomlin");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                                    new Scriptable<TargetConstraintHasStatus>(tchs =>
+                                {
+                                    tchs.not = true;
+                                    tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
+                                }),
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.not = true;
+                                    tcht.trait = TryGet<TraitData>("Zoomlin");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                                    new Scriptable<TargetConstraintHasStatus>(tchs =>
+                                {
+                                    tchs.not = true;
+                                    tchs.status = TryGet<StatusEffectFreeAction>("Free Action (Zoomlin)");
+                                }),
                             };
                         })
                         );
@@ -1701,8 +2063,8 @@ namespace WildfrostTheGathering
                         .WithCanBeBoosted(false)
                         .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDrawn>(data =>
                         {
-                            ScriptableAmountAny scriptAmount = ScriptableAmountAny.CreateInstance<ScriptableAmountAny>();
-                            scriptAmount.custom = 2;
+                            ScriptableFixedAmount scriptAmount = ScriptableFixedAmount.CreateInstance<ScriptableFixedAmount>();
+                            scriptAmount.amount = 2;
                             data.effectToApply = TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
                             data.applyConstraints = new TargetConstraint[]
                             {
@@ -1752,8 +2114,8 @@ namespace WildfrostTheGathering
 
                     // Shared Animosity: Apply Sice equal to Flying allies to all Flying allies
                     assets.Add(new StatusEffectDataBuilder(this)
-                        .Create<StatusEffectApplyXOnCardPlayed>("Apply Spice To Flying Allies Equal To Flying Allies")
-                        .WithText("Apply <keyword=spice> to Flying allies equal to the number of {0} allies")
+                        .Create<StatusEffectApplyXOnCardPlayed>("Apply Spice To Flying Allies Equal To Twice Flying Allies")
+                        .WithText("Apply <keyword=spice> to {0} allies equal to twice the number of {0} allies")
                         .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
                         .WithStackable(true)
                         .WithCanBeBoosted(false)
@@ -1772,12 +2134,90 @@ namespace WildfrostTheGathering
                             ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                             scriptAmount.allies = true;
                             scriptAmount.hasTrait = TryGet<TraitData>("Flying");
+                            scriptAmount.mult = 2;
                             data.scriptableAmount = scriptAmount;
                             data.applyEqualAmount = true;
                         })
                         );
 
-                }  // Item Effects
+                    // Bottle-Cap Blast: Instant gain treasures equal to health
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXInstant>("Instant Add Treasure To Hand Equal To Target Health Below Zero")
+                        .WithText("Add {0} to your hand equal to the excess damage done")
+                        .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Target;
+                            ScriptableCurrentHealth scriptAmount = ScriptableCurrentHealth.CreateInstance<ScriptableCurrentHealth>();
+                            scriptAmount.multiplier = -1;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHealthLessThan>(tchlt =>
+                                {
+                                    tchlt.value = 0;
+                                    tchlt.allowNegative = true;
+                                }),
+                            };
+                            data.scriptableAmount = scriptAmount;
+                            data.applyEqualAmount = true;
+                            data.targetMustBeAlive = false;
+                        })
+                        );
+
+                    // Explosive Vegetation: Add "Instant add zoomlin to X random cards in hand" to self
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Gain Zoomlin To X Random Cards In Hand")
+                        .WithText("Add <keyword=zoomlin> to <{a}> random cards in hand")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                        })
+                        );
+
+                    // Explosive Vegetation: Add Zoomlin to a random card in hand
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXMultipleInstant>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomCardInHand;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.not = true;
+                                    tcht.trait = TryGet<TraitData>("Noomlin");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                                    new Scriptable<TargetConstraintHasStatus>(tchs =>
+                                {
+                                    tchs.not = true;
+                                    tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
+                                }),
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.not = true;
+                                    tcht.trait = TryGet<TraitData>("Zoomlin");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                                    new Scriptable<TargetConstraintHasStatus>(tchs =>
+                                {
+                                    tchs.not = true;
+                                    tchs.status = TryGet<StatusEffectFreeAction>("Free Action (Zoomlin)");
+                                }),
+                            };
+                        })
+                        );
+
+                }  // Item Effects 
 
                 {  // Clunker Effects
 
@@ -1799,14 +2239,489 @@ namespace WildfrostTheGathering
                         })
                         );
 
-                }  // Clunker Effects
+                    // Bootlegger's Stash: While active, add "Add a treasure to your hand" to allies in row
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectWhileActiveX>("While Active Treasure To AlliesInRow")
+                        .WithText("While active, add \"Add <{a}> {0} to your hand\" to allies in row")
+                        .WithTextInsert($"<card=whycats.wildfrost.wildfrostthegathering.treasure>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectApplyXOnCardPlayedUpdateDesc>("On Card Played Add Treasure To Hand");
+                            data.affectsSelf = false;
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AlliesInRow;
+                            data.hiddenKeywords = new KeywordData[]
+                            {
+                                TryGet<KeywordData>("Active"),
+                            };
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintOr>(tco =>
+                                {
+                                    tco.constraints = new TargetConstraint[] {
+                                        new Scriptable<TargetConstraintHasReaction>(),
+                                        new Scriptable<TargetConstraintMaxCounterMoreThan>(tcmcmt =>
+                                        {
+                                            tcmcmt.moreThan = 0;
+                                        })};
+                                })
+                            };
+                        })
+                        );
+
+                    // Bootlegger's Stash: Add treasure but updates description when it changes
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayedUpdateDesc>("On Card Played Add Treasure To Hand")
+                        .WithText("Add <{a}> {0} to your hand")
+                        .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayedUpdateDesc>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                            data.queue = true;
+                            data.separateActions = true;
+                            data.doPing = true;
+                        })
+                        );
+
+                    // Rites of Flourishing: Count frontmost enemy down by 1
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Reduce Counter To Front Enemy")
+                        .WithText("Count down frontmost enemy's <sprite name=counter> by <{a}>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontEnemy;
+                        })
+                        );
+
+                    // Rites of Flourishing: Count allies in row down by 1
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Reduce Counter To Allies In Row")
+                        .WithText("Count down <sprite name=counter> of allies in row by <{a}>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AlliesInRow;
+                        })
+                        );
+
+                    // Mox Jasper: When destroyed, add Zoomlin to Flying allies in hand
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenDestroyed>("When Destroyed Gain Zoomlin To Flying Allies In Hand")
+                        .WithCanBeBoosted(true)
+                        .WithStackable(true)
+                        .WithText("When destroyed, add <keyword=zoomlin> to {0} allies in hand")
+                        .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Zoomlin");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Hand;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintIsUnit>(),
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.trait = TryGet<TraitData>("Flying");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                            };
+                            data.targetMustBeAlive = false;
+                        })
+                        );
+
+                    // Tempting Contract: count down random enemy by 1
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Reduce Counter To Random Enemy")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .WithText("Count down a random enemy's <keyword=counter> by <{a}>")
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
+                        })
+                        );
+
+                    // Gravitational Shift: While active, add attack to flying allies
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectWhileActiveX>("While Active Increase Attack To Flying Allies")
+                        .WithText("While active, add <+{a}><keyword=attack> to all {0} allies")
+                        .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
+                        {
+                            data.hiddenKeywords = new KeywordData[]
+                            {
+                                TryGet<KeywordData>("Active"),
+                            };
+                            data.eventPriority = 10;
+                            data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.trait = TryGet<TraitData>("Flying");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                            };
+                        })
+                        );
+
+                    // Gravitational Shift: While active, reduce attack to non Flying
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectWhileActiveX>("While Active Reduce Attack To Non Flying")
+                        .WithText("And everyone else gets <-{a}><keyword=attack>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
+                        {
+                            data.hiddenKeywords = new KeywordData[]
+                            {
+                                TryGet<KeywordData>("Active"),
+                            };
+                            data.eventPriority = 10;
+                            data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Reduce Attack");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.not = true;
+                                    tcht.trait = TryGet<TraitData>("Flying");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                            };
+                        })
+                        );
+
+                    // Revel in Riches: Gain 1 treasure when an enemy is killed
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenUnitIsKilled>("Add Treasure To Hand When Enemy Killed")
+                        .WithText("Add <{a}> {0} to your hand when an enemy is killed")
+                        .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenUnitIsKilled>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                            data.queue = true;
+                            data.enemy = true;
+                            data.ally = false;
+                        })
+                        );
+
+                    // Revel in Riches: Gain Spice when Treasure is played
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCertainCardPlayed>("Gain Spice On Treasure")
+                        .WithText("Gain <{a}><keyword=spice> whenever a {0} is played")
+                        .WithTextInsert("<card=whycats.wildfrost.wildfrostthegathering.treasure>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectSpice>("Spice");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                            data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
+                        })
+                        );
+
+                    // Windcrag Siege: While active add 1 frenzy to ally behind
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectWhileActiveXUpdatesOnOtherMove>("While Active Frenzy To AllyBehind")
+                        .WithText("While active, add <x{a}><keyword=frenzy> to ally behind")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesOnOtherMove>(data =>
+                        {
+                            data.hiddenKeywords = new KeywordData[]
+                            {
+                                TryGet<KeywordData>("Active"),
+                            };
+                            data.eventPriority = 10;
+                            data.effectToApply = TryGet<StatusEffectMultiHit>("MultiHit");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                        })
+                        );
+
+                }  // Clunker Effects 
+
+                {  // Leader Effects
+
+                    // The Ur-Dragon: While active, Flying allies gain zoomlin when drawn
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectWhileActiveX>("While Active Zoomlin When Drawn To Flying Allies In Hand")
+                        .WithText("While active, {0} allies gain <keyword=zoomlin> when drawn")
+                        .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
+                        {
+                            data.eventPriority = 10;
+                            data.effectToApply = TryGet<StatusEffectApplyXWhenDrawn>("When Drawn Gain Zoomlin");
+                            data.applyConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasTrait>(tcht =>
+                                {
+                                    tcht.trait = TryGet<TraitData>("Flying");
+                                    tcht.ignoreSilenced = false;
+                                }),
+                                new Scriptable<TargetConstraintIsUnit>(tciu =>
+                                {
+                                    tciu.mustBeMiniboss = false;
+                                }),
+                            };
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Hand;
+                        })
+                        );
+
+                    // Miirym: Instant Gain Fragile
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXInstant>("Instant Gain Fragile")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Fragile");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                            data.targetConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintIsUnit>(tciu =>
+                                {
+                                    tciu.mustBeMiniboss = false;
+                                }),
+                                new Scriptable<TargetConstraintHasHealth>(),
+                            };
+                        })
+                        );
+
+                    // Miirym: Temporary Fragile
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectTemporaryTrait>("Temporary Fragile")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .WithIsKeyword(true)    // This effect adds text to the card. 
+                        .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTrait>(data =>
+                        {
+                            data.targetConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintIsUnit>(tciu =>
+                                {
+                                    tciu.mustBeMiniboss = false;
+                                }),
+                                new Scriptable<TargetConstraintHasHealth>(),
+                            };
+                            data.trait = TryGet<TraitData>("Fragile");
+                        })
+                        );
+
+                    // Miirym: Summon copy of ally ahead with 1 health and fragile
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectInstantSummon>("Instant Summon Copy With X Health And Fragile")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                        {
+                            data.hiddenKeywords = new KeywordData[]
+                            {
+                                TryGet<KeywordData>("Copy"),
+                            };
+                            data.eventPriority = 99999;
+                            data.targetSummon = TryGet<StatusEffectSummon>("Summon Plep");
+                            data.summonCopy = true;
+                            data.withEffects = new StatusEffectData[]
+                            {
+                                TryGet<StatusEffectInstantSetHealth>("Set Health"),
+                                TryGet<StatusEffectApplyXInstant>("Instant Gain Fragile")
+                            };
+
+                            data.targetConstraints = new TargetConstraint[]
+                            {
+                                new Scriptable<TargetConstraintHasHealth>(),
+                                new Scriptable<TargetConstraintIsUnit>(tciu =>
+                                {
+                                    tciu.mustBeMiniboss = false;
+                                }),
+                            };
+                        })
+                        );
+
+                    // Miirym: On Card Played, summon copy of ally ahead
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Summon Copy Of Ally Ahead With X Health And Fragile")
+                        .WithText("Summon a copy of ally ahead with <{a}><keyword=health> and <keyword=fragile>")
+                        .WithStackable(true)
+                        .WithCanBeBoosted(true)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Copy With X Health And Fragile");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyInFrontOf;
+                            
+                        })
+                        );
+
+                    // Lathliss: Trigger when Flying ally deployed
+                    assets.Add(new StatusEffectDataBuilder(this)
+                        .Create<StatusEffectApplyXWhenDeployedNoHandIfTrait>("When Flying Ally Deployed Summon Dragon Token")
+                        .WithText("Summon a <card=whycats.wildfrost.wildfrostthegathering.dragonToken> whenever a {0} ally is deployed")
+                        .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
+                        .WithStackable(false)
+                        .WithCanBeBoosted(false)
+                        .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
+                        {
+                            data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Dragon Token");
+                            data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                            data.whenSelfDeployed = false;
+                            data.whenAllyDeployed = true;
+                            data.wantedTrait = TryGet<TraitData>("Flying");
+                            data.excludedCards = new List<CardData> { TryGet<CardData>("dragonToken")};
+                        })
+                        );
+
+                }  // Leader Effects
             }  // Effects
 
             {  // Companions
 
+                {  // Pets
+
+                    // Wall of Omens
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("wallOfOmens", "Wall Of Omens", idleAnim: "SwayAnimationProfile")
+                        .SetStats(7, null, 0)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("wall-of-omensjpaick.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("When Deployed Draw", 1),
+                            };
+                        })
+                        );
+
+                    // Air Elemental
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("airElemental", "Air Elemental", idleAnim: "FloatAnimationProfile")
+                        .SetStats(6, 4, 4)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("air-elemental-kwalker.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.traits = new List<CardData.TraitStacks>
+                            {
+                                TStack("Flying", 1),
+                            };
+                        })
+                        );
+
+                    // Ball Lightning
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("ballLightning", "Ball Lightning")
+                        .SetStats(1, 6, 4)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("ball-lightning-tclaxton.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.traits = new List<CardData.TraitStacks>
+                            {
+                                TStack("Spark", 1),
+                            };
+                        })
+                        );
+
+                    // Wall of Frost
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("wallOfFrost", "Wall of Frost", idleAnim: "")  // Bad strings freeze it
+                        .SetStats(6, null, 0)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("wall-of-frost-mbierek.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("When Hit Apply Snow To Attacker", 1),
+                            };
+                        })
+                        );
+
+                    // Atog
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("atog", "Atog")
+                        .SetStats(5, 3, 3)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("atog-puddnhead.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("When Ally Is Killed Apply Attack To Self", 1),
+                            };
+                        })
+                        );
+
+                    // Llanowar Elves
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("llanowarElves", "Llanowar Elves")
+                        .SetStats(5, 1, 3)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("llanowar-elves-kwalker.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                            SStack("On Card Played Gain Zoomlin To X Random Cards In Hand", 1),
+                            };
+                        })
+                        );
+
+                    // Grizzly Bears
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("grizzlyBears", "Grizzly Bears")
+                        .SetStats(2, 2, 2)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("grizzly-bears-jamenges.png", "companion-bg.png")
+                        .WithFlavour("Don\'t try to outrun one of Dominia\'s Grizzlies; it\'ll catch you, knock you down, and eat you. Of course, you could run up a tree. In that case you\'ll get a nice view before it knocks the tree down and eats you.")
+                        .WithValue(50)
+                        );
+
+                    // Juggernaut
+                    assets.Add(new CardDataBuilder(this)
+                        .CreateUnit("juggernaut", "Juggernaut")
+                        .SetStats(5, 5, 3)
+                        .IsPet((ChallengeData)null, true)
+                        .SetSprites("juggernaut-kwalker.png", "companion-bg.png")
+                        .WithValue(50)
+                        .SubscribeToAfterAllBuildEvent(data =>
+                        {
+                            data.startWithEffects = new CardData.StatusEffectStacks[]
+                            {
+                                SStack("On Card Played Damage To Self", 1),
+                            };
+                        })
+                        );
+
+                }  // Pets
+
                 // Dragon Token
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("dragonToken", "Dragon Token")
+                    new CardDataBuilder(this).CreateUnit("dragonToken", "Dragon Token", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("dragon-token-kyanner.png", "companion-bg.png")
                     .SetStats(1, 4, 3)
                     .WithCardType("Summoned")
@@ -1824,9 +2739,9 @@ namespace WildfrostTheGathering
 
                 // Dragon Token with Spark
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("dragonTokenSpark", "Dragon Illusion Token")
+                    new CardDataBuilder(this).CreateUnit("dragonTokenSpark", "Dragon Illusion Token", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("dragon-illusion-token-amar.png", "companion-bg.png")
-                    .SetStats(1, 4, 3)
+                    .SetStats(1, 1, 3)
                     .WithCardType("Summoned")
                     .WithFlavour("rawr!")
                     .WithValue(25)
@@ -1843,7 +2758,7 @@ namespace WildfrostTheGathering
 
                 // Goldspan Dragon
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("goldspanDragon", "Goldspan Dragon")
+                    new CardDataBuilder(this).CreateUnit("goldspanDragon", "Goldspan Dragon", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("goldspan-dragon-amar.png", "companion-bg.png")
                     .SetStats(7, 4, 4)
                     .WithCardType("Friendly")
@@ -1867,7 +2782,7 @@ namespace WildfrostTheGathering
 
                 // Ancient Copper Dragon
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("ancientCopperDragon", "Ancient Copper Dragon")
+                    new CardDataBuilder(this).CreateUnit("ancientCopperDragon", "Ancient Copper Dragon", idleAnim: "GiantAnimationProfile")
                     .SetSprites("ancient-copper-dragon-ajmanzan.png", "companion-bg.png")
                     .SetStats(8, 5, 5)
                     .WithCardType("Friendly")
@@ -1889,11 +2804,11 @@ namespace WildfrostTheGathering
 
                 // Atsushi, Blazing Sky
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("atsushiBlazingSky", "Atsushi, the Blazing Sky")
+                    new CardDataBuilder(this).CreateUnit("atsushiBlazingSky", "Atsushi, the Blazing Sky", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("atsushi-blazing-sky-vaminguez.png", "companion-bg.png")
                     .SetStats(7, 1, 3)
                     .WithCardType("Friendly")
-                    .WithFlavour("<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>")
+                    .WithFlavour("\"<i>The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b></i>")
                     .WithValue(45)
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -1907,15 +2822,14 @@ namespace WildfrostTheGathering
                             new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
                             TStack("Eternal", 1),
                         };
-                        data.greetMessages = new string[3] { "<i>Deep crimson in color and one hundred feet long, she is the reincarnation of the dragon spirit <b>Ryusei</b></i>",
-                            "<i><b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b></i>",
+                        data.greetMessages = new string[2] { "<i><b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b></i>",
                             "<i>The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b></i>" };
                     })
                     );
 
                 // Utvara Hellkite
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("utvaraHellkite", "Utvara Hellkite")
+                    new CardDataBuilder(this).CreateUnit("utvaraHellkite", "Utvara Hellkite", idleAnim: "Heartbeat2AnimationProfile")
                     .SetSprites("utvara-hellkite-mzug.png", "companion-bg.png")
                     .SetStats(8, 4, 5)
                     .WithCardType("Friendly")
@@ -1956,7 +2870,7 @@ namespace WildfrostTheGathering
 
                 // Terror of the Peaks
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("terrorOfThePeaks", "Terror of the Peaks")
+                    new CardDataBuilder(this).CreateUnit("terrorOfThePeaks", "Terror of the Peaks", idleAnim: "Heartbeat2AnimationProfile")
                     .SetSprites("terror-of-the-peaks-jraphael.png", "companion-bg.png")
                     .SetStats(6, 5, 5)
                     .WithCardType("Friendly")
@@ -1978,7 +2892,7 @@ namespace WildfrostTheGathering
 
                 // Captain Lannery Storm
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("captainLanneryStorm", "Captain Lannery Storm")
+                    new CardDataBuilder(this).CreateUnit("captainLanneryStorm", "Captain Lannery Storm", idleAnim: "ShakeAnimationProfile")
                     .SetSprites("captain-lannery-storm-crallis.png", "companion-bg.png")
                     .SetStats(3, 2, 3)
                     .WithCardType("Friendly")
@@ -2011,20 +2925,20 @@ namespace WildfrostTheGathering
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
-                            SStack("Trigger On Treasure", 1),
+                            SStack("Trigger On First Treasure", 1),
                         };
                         data.traits = new List<CardData.TraitStacks>()
                         {
                             TStack("Draw", 1)
                         };
                         data.greetMessages = new string[2] { "<i>Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold</i>",
-                        "<i>It shapes wonders beyond our wildest dreams</i>\n<i>Like sandwiches!</i>"};
+                        "<i>It shapes wonders beyond our wildest dreams...</i>\n<i>Like sandwiches!</i>"};
                     })
                     );
 
                 // Glorybringer
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("glorybringer", "Glorybringer")
+                    new CardDataBuilder(this).CreateUnit("glorybringer", "Glorybringer", idleAnim: "ShakeAnimationProfile")
                     .SetSprites("glorybringer-sburley.png", "companion-bg.png")
                     .SetStats(5, 3, 3)
                     .WithCardType("Friendly")
@@ -2047,7 +2961,7 @@ namespace WildfrostTheGathering
 
                 // Earthquake Dragon
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("earthquakeDragon", "Earthquake Dragon")
+                    new CardDataBuilder(this).CreateUnit("earthquakeDragon", "Earthquake Dragon", idleAnim: "GiantAnimationProfile")
                     .SetSprites("earthquake-dragon-jgrenier.png", "companion-bg.png")
                     .SetStats(10, 10, 8)
                     .WithCardType("Friendly")
@@ -2063,13 +2977,14 @@ namespace WildfrostTheGathering
                         {
                             SStack("While Active Reduce Counter By Allies With Flying", 2),
                         };
-                        data.greetMessages = new string[2] { "<i>An empire can take centuries to build but mere moments to destroy</i>", "*The ground rumbles beneath your feet*" };
+                        data.greetMessages = new string[2] { "<i>An empire can take centuries to build but mere moments to destroy</i>",
+                            "*The ground rumbles beneath your feet*" };
                     })
                     );
 
                 // Ojutai, Soul of Winter
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("ojutaiSoulOfWinter", "Ojutai, Soul of Winter")
+                    new CardDataBuilder(this).CreateUnit("ojutaiSoulOfWinter", "Ojutai, Soul of Winter", idleAnim: "FloatAnimationProfile")
                     .SetSprites("ojutai-soul-of-winter-cstone.png", "companion-bg.png")
                     .SetStats(9, 2, 4)
                     .WithCardType("Friendly")
@@ -2110,7 +3025,7 @@ namespace WildfrostTheGathering
 
                 // Shivan Dragon
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("shivanDragon", "Shivan Dragon")
+                    new CardDataBuilder(this).CreateUnit("shivanDragon", "Shivan Dragon", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("shivan-dragon-dgiancola.png", "companion-bg.png")
                     .SetStats(7, 4, 3)
                     .WithCardType("Friendly")
@@ -2133,7 +3048,7 @@ namespace WildfrostTheGathering
 
                 // Manaform Hellkite
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("manaformHellkite", "Manaform Hellkite")
+                    new CardDataBuilder(this).CreateUnit("manaformHellkite", "Manaform Hellkite", idleAnim: "FloatSquishAnimationProfile")
                     .SetSprites("manaform-hellkite-amar.png", "companion-bg.png")
                     .SetStats(5, 2, 4)
                     .WithCardType("Friendly")
@@ -2155,7 +3070,7 @@ namespace WildfrostTheGathering
 
                 // Voracious Hydra
                 assets.Add(
-                    new CardDataBuilder(this).CreateUnit("voraciousHydra", "Voracious Hydra")
+                    new CardDataBuilder(this).CreateUnit("voraciousHydra", "Voracious Hydra", idleAnim: "Heartbeat2AnimationProfile")
                     .SetSprites("voracious-hydra-wreynolds.png", "companion-bg.png")
                     .SetStats(2, 1, 2)
                     .WithCardType("Friendly")
@@ -2175,13 +3090,32 @@ namespace WildfrostTheGathering
                     })
                     );
 
+                // Fear of Sleep Paralysis (no art!)
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("fearOfSleepParalysis", "Fear of Sleep Paralysis", idleAnim: "SwayAnimationProfile")
+                    .SetStats(7, 2, 3)
+                    .SetSprites("dragon-baby.png", "companion-bg.png")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                                TStack("Flying", 1),
+                        };
+                        data.attackEffects = new CardData.StatusEffectStacks[]
+                        {
+                                SStack("Snow", 2),
+                        };
+                    })
+                    );
+
             }  // Companions
 
             {  // Items
 
                 // Shock
                 assets.Add(new CardDataBuilder(this)
-                        .CreateItem("shock", "Shock")
+                        .CreateItem("shock", "Shock", idleAnim: "ShakeAnimationProfile")
                         .WithFlavour("\"The beauty of it is they never see it coming. Ever.\"\n<b>-Razzix, sparkmage</b>")
                         .SetDamage(2)
                         .SetSprites("shock-jfoster.png", "item-bg.png")
@@ -2190,7 +3124,7 @@ namespace WildfrostTheGathering
 
                 // Cancel
                 assets.Add(new CardDataBuilder(this)
-                    .CreateItem("cancel", "Cancel")
+                    .CreateItem("cancel", "Cancel", idleAnim:"FloatAnimationProfile")
                     .WithFlavour("\"Even the greatest inferno begins as a spark. And anyone can snuff out a spark.\"\n<b>-Chanyi, mistfire sage</b>")
                     .SetDamage(0)
                     .SetSprites("cancel-dpalumb.png", "item-bg.png")
@@ -2210,7 +3144,7 @@ namespace WildfrostTheGathering
 
                 // Swiftfoot Boots
                 assets.Add(new CardDataBuilder(this)
-                    .CreateItem("swiftfootBoots", "Swiftfoot Boots")
+                    .CreateItem("swiftfootBoots", "Swiftfoot Boots", idleAnim:"FloatAnimationProfile")
                     .SetDamage(null)
                     .SetSprites("swiftfoot-boots-svelinov.png", "item-bg.png")
                     .WithValue(50)  // Base price in shop: 35-55
@@ -2230,7 +3164,7 @@ namespace WildfrostTheGathering
                 // Treasure
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("treasure", "Treasure")
+                    .CreateItem("treasure", "Treasure", idleAnim:"ShakeAnimationProfile")
                     .SetSprites("treasure-orichards.png", "item-bg.png")
                     .SetDamage(null)
                     .WithCardType("Item")
@@ -2262,7 +3196,7 @@ namespace WildfrostTheGathering
                 // Dragon's Fire
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("dragonsFire", "Dragon's Fire")
+                    .CreateItem("dragonsFire", "Dragon's Fire", idleAnim: "ShakeAnimationProfile")
                     .SetSprites("dragons-fire-cwhite.png", "item-bg.png")
                     .WithText("Trigger a <keyword=whycats.wildfrost.wildfrostthegathering.flying> ally")
                     .SetDamage(2)
@@ -2289,7 +3223,7 @@ namespace WildfrostTheGathering
                 // Delayed Blast Fireball
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("delayedBlastFireball", "Delayed Blast Fireball")
+                    .CreateItem("delayedBlastFireball", "Delayed Blast Fireball", idleAnim: "ShakeAnimationProfile")
                     .SetDamage(3)
                     .WithCardType("Item")
                     .WithFlavour("The spell will fall upon a crowd like a dragon, ancient and full of death")
@@ -2312,7 +3246,7 @@ namespace WildfrostTheGathering
                 // Spit Flame
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("spitFlame", "Spit Flame")
+                    .CreateItem("spitFlame", "Spit Flame", idleAnim: "ShakeAnimationProfile")
                     .SetSprites("spit-flame-crahn.png", "item-bg.png")
                     .SetDamage(2)
                     .WithCardType("Item")
@@ -2331,7 +3265,7 @@ namespace WildfrostTheGathering
                 // Draconic Lore
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("draconicLore", "Draconic Lore")
+                    .CreateItem("draconicLore", "Draconic Lore", idleAnim:"FloatAnimationProfile")
                     .SetSprites("draconic-lore-tbabbey.png", "item-bg.png")
                     .SetDamage(null)
                     .WithCardType("Item")
@@ -2354,7 +3288,7 @@ namespace WildfrostTheGathering
                 // Lofty Denial
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("loftyDenial", "Lofty Denial")
+                    .CreateItem("loftyDenial", "Lofty Denial", idleAnim:"FloatAnimationProfile")
                     .SetSprites("lofty-denial-mcastanon.png", "item-bg.png")
                     .SetDamage(0)
                     .WithCardType("Item")
@@ -2375,25 +3309,25 @@ namespace WildfrostTheGathering
 
                 // Spell Swindle
                 assets.Add(new CardDataBuilder(this)
-                    .CreateItem("spellSwindle", "Spell Swindle")
+                    .CreateItem("spellSwindle", "Spell Swindle", idleAnim:"ShakeAnimationProfile")
                     .SetSprites("spell-swindle-vaminguez.png", "item-bg.png")
                     .SetDamage(0)
                     .WithCardType("Item")
                     .WithFlavour("Honesty is the first casualty of war")
-                    .WithValue(40)  // Base price in shop: +-6
+                    .WithValue(50)  // Base price in shop: +-6
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
                         data.attackEffects = new CardData.StatusEffectStacks[]
                         {
+                            SStack("Snow", 2),
                             SStack("Instant Add Treasure To Hand Equal To Target Counter", 1),
-                            SStack("Snow", 2)
                         };
                     })
                     );
 
                 // Fireball
                 assets.Add(new CardDataBuilder(this)
-                    .CreateItem("fireball", "Fireball")
+                    .CreateItem("fireball", "Fireball", idleAnim: "ShakeAnimationProfile")
                     .SetSprites("fireball-mtedin.png", "item-bg.png")
                     .SetDamage(1)
                     .WithCardType("Item")
@@ -2413,11 +3347,11 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                // Shared Animosity (no art!)
+                // Shared Animosity
                 assets.Add(
                     new CardDataBuilder(this)
-                    .CreateItem("sharedAnimosity", "Shared Animosity")
-                    .SetSprites("placeholder-item.png", "item-bg.png")
+                    .CreateItem("sharedAnimosity", "Shared Animosity", idleAnim: "Heartbeat2AnimationProfile")
+                    .SetSprites("shared-animosity-clukacs.png", "item-bg.png")
                     .SetDamage(null)
                     .WithCardType("Item")
                     .WithFlavour("\"It is the nature of souls that they burn more brightly together than apart.\"\n<b>—Vessifrus, flamekin demagogue</b>")
@@ -2426,22 +3360,58 @@ namespace WildfrostTheGathering
                     {
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
-                            SStack("Apply Spice To Flying Allies Equal To Flying Allies", 1),
+                            SStack("Apply Spice To Flying Allies Equal To Twice Flying Allies", 1),
                         };
                         data.needsTarget = false;
                     })
                     );
 
-            }  // Items
+                // Bottle-Cap Blast
+                assets.Add(new CardDataBuilder(this)
+                    .CreateItem("bottleCapBlast", "Bottle-Cap Blast", idleAnim: "ShakeAnimationProfile")
+                    .SetSprites("bottle-cap-blast-lsmilshkalne.png", "item-bg.png")
+                    .SetDamage(5)
+                    .WithCardType("Item")
+                    .WithFlavour("\"You\'ve got how much gold there??\"")
+                    .WithValue(40)  // Base price in shop: +-6
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.attackEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Instant Add Treasure To Hand Equal To Target Health Below Zero", 1),
+                        };
+                    })
+                    );
+
+                // Explosive Vegetation
+                assets.Add(
+                    new CardDataBuilder(this)
+                    .CreateItem("explosiveVegetation", "Explosive Vegetation", idleAnim: "FloatSquishAnimationProfile")
+                    .SetSprites("explosive-vegetation-javon.png", "item-bg.png")
+                    .SetDamage(null)
+                    .WithCardType("Item")
+                    .WithFlavour("Despite the flames and devastation of the dragons, Tarkir continued to thrive.")
+                    .WithValue(40)  // Base price in shop: +-6
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("On Card Played Gain Zoomlin To X Random Cards In Hand", 2),
+                        };
+                        data.needsTarget = false;
+                    })
+                    );
+
+            }  // Items 
 
             {  // Clunkers
 
-                // Sol Ring
+                // Lotus Petal
                 assets.Add(new CardDataBuilder(this)
-                    .CreateUnit("solRing", "Sol Ring")
+                    .CreateUnit("lotusPetal", "Lotus Petal", idleAnim: "ShakeAnimationProfile")
                     .WithCardType("Clunker")
                     .SetStats(null, null, 0)
-                    .SetSprites("sol-ring-mbierek.png", "clunker-bg.png")
+                    .SetSprites("lotus-petal-alee.png", "clunker-bg.png")
                     .WithValue(50)
                     .SubscribeToAfterAllBuildEvent(data =>
                     {
@@ -2453,7 +3423,168 @@ namespace WildfrostTheGathering
                     })
                     );
 
-            }  // Clunkers
+                // Bootlegger's Stash
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("bootleggersStash", "Bootlegger's Stash", idleAnim: "FloatAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("bootleggers-stash-aovchinnikova.png", "clunker-bg.png")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Scrap"), 1),
+                            SStack("While Active Treasure To AlliesInRow", 1),
+                        };
+                    })
+                    );
+
+                // Rites of Flourishing
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("ritesOfFlourishing", "Rites of Flourishing", idleAnim: "FloatSquishAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 1)
+                    .SetSprites("rites-of-flourishing-bkitkouski.png", "clunker-bg.png")
+                    .WithFlavour("\"Dance, and bring forth the coil! It is an umbilical to <b>Gaea</b> herself, fattening us with the earth\'s rich bounty.\"")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Scrap"), 3),
+                            SStack("On Card Played Reduce Counter To Allies In Row", 1),
+                            SStack("On Card Played Reduce Counter To Front Enemy", 1),
+                            SStack("On Card Played Lose Scrap To Self", 1),
+                        };
+                    })
+                    );
+
+                // Mox Jasper
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("moxJasper", "Mox Jasper", idleAnim: "FloatAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("mox-jasper-sbelledin.png", "clunker-bg.png")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Zoomlin", 1)
+                        };
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            new CardData.StatusEffectStacks(Get<StatusEffectData>("Scrap"), 1),
+                            SStack("When Destroyed Gain Zoomlin To Flying Allies In Hand", 1)
+                        };
+                    })
+                    );
+
+                // Tempting Contract
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("temptingContract", "Tempting Contract", idleAnim: "FloatSquishAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 2)
+                    .SetSprites("tempting-contract-tduchek.png", "clunker-bg.png")
+                    .WithFlavour("\"Dont think of it as debt. Think of it as an investment in yourself.\"\n-<b>Diriga, demon bursar</b>")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Scrap", 1),
+                            SStack("On Card Played Add Treasure To Hand", 1),
+                            SStack("On Card Played Reduce Counter To Random Enemy", 1)
+                        };
+                    })
+                    );
+
+                // Gravitational Shift
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("gravitationalShift", "Gravitational Shift", idleAnim: "FloatAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("gravitational-shift-svelinov.png", "clunker-bg.png")
+                    .WithFlavour("As they awakened, the Eldrazi reasserted their mastery over all of <b>Zendikar\'s</b> natural forces.")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Scrap", 1),
+                            SStack("While Active Increase Attack To Flying Allies", 1),
+                            SStack("While Active Reduce Attack To Non Flying", 1)
+                        };
+                    })
+                    );
+
+                // Revel in Riches
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("revelInRiches", "Revel In Riches", idleAnim: "SwayAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, 0, 0)
+                    .SetSprites("revel-in-riches-edeschamps.png", "clunker-bg.png")
+                    .WithFlavour("\"I can prove I won fair and square — I have the receipt.\"")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Barrage", 1)
+                        };
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Scrap", 2),
+                            SStack("Gain Spice On Treasure", 1),
+                            SStack("Add Treasure To Hand When Enemy Killed", 1),
+                            SStack("When Spice X Applied To Self Trigger To Self", 5),
+                        };
+                    })
+                    );
+
+                // Dragon's Hoard
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("dragonsHoard", "Dragon's Hoard", idleAnim: "FloatAnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("dragons-hoard-apaquette.png", "clunker-bg.png")
+                    .WithFlavour("\"Unimaginable riches? I assure you, I have a vivid imagination.\"")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.traits = new List<CardData.TraitStacks>
+                        {
+                            TStack("Draw", 1)
+                        };
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Scrap", 1),
+                            SStack("When Flying Ally Deployed Trigger Self", 1),
+                        };
+                    })
+                    );
+
+                // Windcrag Siege
+                assets.Add(new CardDataBuilder(this)
+                    .CreateUnit("windcragSiege", "Windcrag Siege", idleAnim: "Heartbeat2AnimationProfile")
+                    .WithCardType("Clunker")
+                    .SetStats(null, null, 0)
+                    .SetSprites("windcrag-siege-noleal.png", "clunker-bg.png")
+                    .WithFlavour("\"We are the swift, the strong, the blade's sharp shriek! Fear nothing, and strike!\"")
+                    .WithValue(50)
+                    .SubscribeToAfterAllBuildEvent(data =>
+                    {
+                        data.startWithEffects = new CardData.StatusEffectStacks[]
+                        {
+                            SStack("Scrap", 1),
+                            SStack("While Active Frenzy To AllyBehind", 1),
+                        };
+                    })
+                    );
+
+
+            }  // Clunkers 
 
             {  // Keywords
 
@@ -2677,7 +3808,14 @@ namespace WildfrostTheGathering
             counter.counterRange = new Vector2Int(min, max);
             return counter;
         }
-        
+        internal CardScript AddRandomBoostEffects(int min, int max)  // Increase effects and trait by a random amount
+        {
+            CardScriptAddRandomBoost boost = ScriptableObject.CreateInstance<CardScriptAddRandomBoost>();
+            boost.name = "Boost Effect";
+            boost.boostRange = new Vector2Int(min, max);
+            return boost;
+        }
+
         // To not break leader sprites
         private void FixImage(Entity entity)
         {
