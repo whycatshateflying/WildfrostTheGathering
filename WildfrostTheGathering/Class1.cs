@@ -309,6 +309,33 @@ namespace WildfrostTheGathering
         // Make the StatusEffectApplyXWhenDeployed not trigger while in hand. Thank you Abigail for the code!
         public class StatusEffectApplyXWhenDeployedNoHand : StatusEffectApplyXWhenDeployed
         {
+            public bool summonQueue = false;
+            public override void Init()
+            {
+                if (summonQueue)
+                {
+                    base.OnEnable += ActivateUseQueue;
+                    base.OnCardMove += ActivateUseQueue;
+                }
+                else
+                    base.Init();
+            }
+
+            private IEnumerator ActivateUseQueue(Entity entity)
+            {
+                if ((bool)contextEqualAmount)
+                {
+                    int amount = contextEqualAmount.Get(entity);
+                    ActionQueue.Stack(new ActionSequence(Run(GetTargets(hackyHit), amount)));
+                    yield return null;
+                }
+                else
+                {
+                    ActionQueue.Stack(new ActionSequence(Run(GetTargets(hackyHit))));
+                    yield return null;
+                }
+            }
+
             public override bool RunCardMoveEvent(Entity entity)
             {
                 if (!Battle.IsOnBoard(target))
@@ -317,6 +344,7 @@ namespace WildfrostTheGathering
                 }
                 return base.RunCardMoveEvent(entity);
             }
+
         }
 
         // Only apply the deployed effect if the deployed has a certain trait (Thank you ME for BEING AWESOME and DOING IT MYSELF)
@@ -644,6 +672,7 @@ namespace WildfrostTheGathering
         // Apply X on certain card played. Taken from Abigail's AbsentAvalanche mod directly. (then modified for # of times code) Thank you! :3
         public class StatusEffectApplyXOnCertainCardPlayed : StatusEffectApplyXOnCardPlayed
         {
+            public bool summonQueue = false;
             public bool whileActive = false;
             public int allowedTimes = 0;
             public int numTimesPlayed = 0;
@@ -715,7 +744,13 @@ namespace WildfrostTheGathering
 
             public new IEnumerator Check(Entity entity, Entity[] targets)
             {
-                return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets));
+                if (summonQueue)
+                {
+                    ActionQueue.Stack(new ActionSequence(Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets))));
+                    return null;
+                }
+                else
+                    return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets));
             }
             public IEnumerator ResetTimes(Entity entity)
             {
@@ -738,7 +773,13 @@ namespace WildfrostTheGathering
             public new IEnumerator Check(Entity entity, Entity[] targets)
             {
                 Debug.Log("[WildfrostTheGathering] Beep. Entity is " + entity.name + " and the damage is " + entity.damage.current);
-                return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), entity.damage.current);
+                if (summonQueue)
+                {
+                    ActionQueue.Stack(new ActionSequence(Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), entity.damage.current)));
+                    return null;
+                }
+                else
+                    return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), entity.damage.current);
             }
         }
 
@@ -1408,7 +1449,7 @@ namespace WildfrostTheGathering
                     num += enemies.Count((Entity e) => ((object)cardType == null || e.data.cardType == cardType) && (hasTrait == null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                 }
                 Debug.Log("[WildfrostTheGathering] TargetConstraintIsFeatureOnBoard was called for " + target.name + ". Num was " + num);
-                return (num >= requiredAmount);
+                return not ^ (num >= requiredAmount);
             }
 
             public override bool Check(CardData targetData)
@@ -1502,6 +1543,8 @@ namespace WildfrostTheGathering
             }
         }
 
+        // TODO: Take the bait text (actually probably just make a trigger clone that has text teehee
+        // TODO: Double check if skullclamp can kill and draw from it
         // TODO: Make Delayed Blast Fireball not clear all spice after played
         // TODO: Make beatable ascendeds
         // TODO: Make Lathliss not summon if precontainer is null. That happens in ascended fg
@@ -3498,6 +3541,7 @@ namespace WildfrostTheGathering
                             .WithCanBeBoosted(false)
                             .SubscribeToAfterAllBuildEvent<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>(data =>
                             {
+                                data.summonQueue = true;
                                 data.allowedCardType = ScriptableObject.CreateInstance<CardType>();
                                 data.allowedCardType.item = true;
                                 data.allowedCardType.name = "Item";
@@ -3522,6 +3566,7 @@ namespace WildfrostTheGathering
                                 {
                                 TryGet<StatusEffectInstantSetAttack>("Set Attack"),
                                 };
+                                data.queue = false;
                             })
                             );
 
@@ -4317,6 +4362,7 @@ namespace WildfrostTheGathering
                             .WithCanBeBoosted(true)
                             .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
                             {
+                                data.summonQueue = true;
                                 data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Big Dragon Token With X Health");
                                 data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                                 data.whenSelfDeployed = false;
