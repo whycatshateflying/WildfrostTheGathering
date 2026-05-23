@@ -14,21 +14,25 @@ namespace WildfrostTheGathering
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Effects loading!");
-            // Guttersnipe: trigger when you play an item with attack
+            // Guttersnipe: trigger when you play an item that hits
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On Item With Attack Played")
-                .WithText("Trigger when you plan an item with<keyword=attack>")
+                .WithText("Trigger when you plan an item that hits")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .WithIsReaction(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
                     data.descColorHex = "F99C61";
                     data.allowedCardType = ScriptableObject.CreateInstance<CardType>();
                     data.allowedCardType.item = true;
                     data.allowedCardType.name = "Item";
                     data.attackGreaterThan = -1;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantTrigger>("Trigger");
+                    data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -61,7 +65,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -100,16 +104,16 @@ namespace WildfrostTheGathering
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
                             tcht.not = true;
-                            tcht.trait = wtg.TryGet < TraitData >("Noomlin");
+                            tcht.trait = TryGet<TraitData>("Noomlin");
                             tcht.ignoreSilenced = false;
                         }),
                         new Scriptable<TargetConstraintHasStatus>(tchs =>
                         {
                             tchs.not = true;
-                            tchs.status = wtg.TryGet < StatusEffectFreeAction >("Free Action");
+                            tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
                         }),
                     };
-                    data.effectToApply = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Noomlin");
+                    data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Noomlin");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomCardInHand;
                     data.doPing = false;
                     data.targetMustBeAlive = false;
@@ -124,7 +128,7 @@ namespace WildfrostTheGathering
             .WithCanBeBoosted(true)
             .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
             {
-                data.effectToApply = wtg.TryGet<StatusEffectSnow>("Snow");
+                data.effectToApply = TryGet<StatusEffectSnow>("Snow");
                 data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Enemies;
             })
             );
@@ -138,27 +142,27 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                        wtg.TryGet < KeywordData >("Copy"),
+                        TryGet<KeywordData>("Copy"),
                     };
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Plep");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Plep");
                     data.summonCopy = true;
                     data.withEffects = new StatusEffectData[]
                     {
-                        wtg.TryGet < StatusEffectDestroySelfAfterTurn >("Destroy Self After Turn")
+                        TryGet<StatusEffectDestroySelfAfterTurn>("Destroy Self After Turn")
                     };
                 })
                 );
 
             // Skullclamp: Add "when destroyed draw" to target
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add When Destroyed Draw To Target")
+                .Create<StatusEffectApplyXOnHit>("On Card Played Add When Destroyed Draw To Target")
                 .WithText("Add \"When destroyed, <keyword=draw> <{a}>\" to an ally")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
-                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnHit>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXWhenDestroyedUpdateDesc>("When Destroyed Draw");
+                    data.effectToApply = TryGet<StatusEffectApplyXWhenDestroyedUpdateDesc>("When Destroyed Draw");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Target;
                 })
                 );
@@ -171,7 +175,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectDemonize>("Demonize");
+                    data.effectToApply = TryGet<StatusEffectDemonize>("Demonize");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
                 })
                 );
@@ -211,7 +215,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("injury");
+                    data.summonCard = TryGet<CardData>("injury");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("FlipCreateCard");
                 })
                 );
@@ -227,7 +231,7 @@ namespace WildfrostTheGathering
                 {
                     data.eventPriority = 99999;
                     data.canSummonMultiple = true;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Injury");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Injury");
                     data.summonPosition = StatusEffectInstantSummon.Position.Hand;
                 })
                 );
@@ -241,7 +245,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnHit>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
+                    data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontAlly;
                     data.noTargetType = NoTargetType.None;
                     data.eventPriority = -999;
@@ -260,9 +264,9 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                                    wtg.TryGet < KeywordData >("Active"),
+                        TryGet<KeywordData>("Active"),
                     };
-                    data.effectToApply = wtg.TryGet<StatusEffectMultiHit>("MultiHit");
+                    data.effectToApply = TryGet<StatusEffectMultiHit>("MultiHit");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -275,7 +279,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -288,7 +292,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Temporary Spark");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Spark");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -310,11 +314,11 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectPhasedOut>("Phased Out");
+                    data.effectToApply = TryGet<StatusEffectPhasedOut>("Phased Out");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.hiddenKeywords = new KeywordData[]
                     {
-                        wtg.TryGet <KeywordData>("phasedout"),
+                        TryGet<KeywordData>("phasedout"),
                     };
                     data.doPing = true;
                 })
@@ -328,9 +332,9 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("beastToken");
-                    data.gainTrait = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
-                    data.setCardType = wtg.TryGet<CardType>("Summoned");
+                    data.summonCard = TryGet<CardData>("beastToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
@@ -345,7 +349,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Beast Token");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Beast Token");
                     data.summonPosition = StatusEffectInstantSummon.Position.EnemyRow;
                 })
                 );
@@ -358,7 +362,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXOnCardPlayed>("On Card Played Apply Attack To Self Update Desc");
+                    data.effectToApply = TryGet<StatusEffectApplyXOnCardPlayed>("On Card Played Apply Attack To Self Update Desc");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.doPing = true;
                 })
@@ -372,7 +376,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayedUpdateDesc>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.waitForAnimationEnd = true;
                     data.waitForApplyToAnimationEnd = true;
@@ -404,7 +408,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("treasure");
+                    data.summonCard = TryGet<CardData>("treasure");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("FlipCreateCard");
                 })
                 );
@@ -418,7 +422,7 @@ namespace WildfrostTheGathering
                 {
                     data.eventPriority = 99999;
                     data.canSummonMultiple = true;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Treasure");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Treasure");
                     data.summonPosition = StatusEffectInstantSummon.Position.Hand;
                 })
                 );
@@ -432,7 +436,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.queue = true;
                     data.separateActions = true;
@@ -450,7 +454,7 @@ namespace WildfrostTheGathering
                     .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
                     {
                         data.eventPriority = 99999;
-                        data.effectToApply = wtg.TryGet<StatusEffectData>("Instant Summon Treasure In Hand");
+                        data.effectToApply = TryGet<StatusEffectData>("Instant Summon Treasure In Hand");
                         data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                         data.doPing = false;
                         data.targetMustBeAlive = false;
@@ -466,7 +470,7 @@ namespace WildfrostTheGathering
                     .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyedUpdateDesc>(data =>
                     {
                         data.eventPriority = 99999;
-                        data.effectToApply = wtg.TryGet<StatusEffectInstantDraw>("Instant Draw");
+                        data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
                         data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                         data.doPing = false;
                         data.targetMustBeAlive = false;
@@ -483,9 +487,9 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("dragonToken");
-                    data.gainTrait = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
-                    data.setCardType = wtg.TryGet<CardType>("Summoned");
+                    data.summonCard = TryGet<CardData>("dragonToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
@@ -498,7 +502,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Dragon Token");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Dragon Token");
                     data.summonPosition = StatusEffectInstantSummon.Position.InFrontOfOrOtherRow;
                 })
                 );
@@ -513,9 +517,9 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("dragonTokenSpark");
-                    data.gainTrait = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
-                    data.setCardType = wtg.TryGet<CardType>("Summoned");
+                    data.summonCard = TryGet<CardData>("dragonTokenSpark");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
@@ -564,15 +568,15 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                        wtg.TryGet<KeywordData>("Active"),
+                        TryGet<KeywordData>("Active"),
                     };
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter");
+                    data.effectToApply = TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter");
                     data.applyConstraints = new TargetConstraint[]
                     {
                     new Scriptable<TargetConstraintHasTrait>(tcht =>
                     {
-                        tcht.trait = wtg.TryGet<TraitData>("Flying");
+                        tcht.trait = TryGet<TraitData>("Flying");
                         tcht.ignoreSilenced = false;
                     }),
                     };
@@ -592,11 +596,11 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
                 {
                     data.descColorHex = "F99C61";
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantTrigger>("Trigger");
+                    data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = wtg.TryGet<TraitData>("Flying");
+                    data.wantedTrait = TryGet<TraitData>("Flying");
                 })
                 );
 
@@ -609,9 +613,9 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { wtg.TryGet<CardData>("treasure") };
+                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
                 })
                 );
 
@@ -626,9 +630,9 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
                     data.descColorHex = "F99C61";
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantTrigger>("Trigger");
+                    data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { wtg.TryGet<CardData>("treasure") };
+                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
                     data.allowedTimes = 1;
                 })
                 );
@@ -642,7 +646,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXPostAttackEqualAmount>(data =>
                 {
                     data.dealDamage = true;
-                    data.effectToApply = wtg.TryGet<StatusEffectSnow>("Snow");  // Crashes when I give it no effect O_O
+                    data.effectToApply = TryGet<StatusEffectSnow>("Snow");  // Crashes when I give it no effect O_O
                     data.applyEqualAmount = true;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontEnemy;
                     data.waitForAnimationEnd = true;
@@ -682,13 +686,13 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesOnTrait>(data =>
                 {
-                    data.alsoActivate = wtg.TryGet<TraitData>("Flying");
+                    data.alsoActivate = TryGet<TraitData>("Flying");
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
-                    scriptAmount.hasTrait = wtg.TryGet<TraitData>("Flying");
+                    scriptAmount.hasTrait = TryGet<TraitData>("Flying");
                     data.scriptableAmount = scriptAmount;
                     data.applyEqualAmount = true;
-                    data.effectToApply = wtg.TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter Stackable");
+                    data.effectToApply = TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter Stackable");
                     data.affectsSelf = true;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
@@ -703,10 +707,10 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.allowedTraits = new TraitData[1] { wtg.TryGet<TraitData>($"{wtg.GUID}.Flying") };
+                    data.allowedTraits = new TraitData[1] { TryGet<TraitData>($"{wtg.GUID}.Flying") };
                     data.countsSelf = true;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
-                    data.effectToApply = wtg.TryGet<StatusEffectSnow>("Snow");
+                    data.effectToApply = TryGet<StatusEffectSnow>("Snow");
                     data.whileActive = true;
                 })
                 );
@@ -720,7 +724,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach>("Instant Destroy Treasure In Hand And Draw For Each");
+                    data.effectToApply = TryGet<StatusEffectInstantDestroyNumCardsInHandAndApplyXForEach>("Instant Destroy Treasure In Hand And Draw For Each");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -738,12 +742,12 @@ namespace WildfrostTheGathering
                     {
                         tcisc.allowedCards = new CardData[]
                         {
-                            wtg.TryGet < CardData >("treasure"),
+                            TryGet<CardData>("treasure"),
                         };
                     }),
                     };
-                    data.destroyCardEffect = wtg.TryGet<StatusEffectInstantKill>("Kill");
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    data.destroyCardEffect = TryGet<StatusEffectInstantKill>("Kill");
+                    data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
                 })
                 );
 
@@ -754,7 +758,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSpice>("Spice");
+                    data.effectToApply = TryGet<StatusEffectSpice>("Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Applier;
                     data.doPing = false;
                     data.targetMustBeAlive = false;
@@ -769,12 +773,12 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXPreTurn>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXInstant>("Instant Apply Spice To Applier");
+                    data.effectToApply = TryGet<StatusEffectApplyXInstant>("Instant Apply Spice To Applier");
                     data.applyConstraints = new TargetConstraint[]
                     {
                     new Scriptable<TargetConstraintHasTrait>(tcht =>
                     {
-                        tcht.trait = wtg.TryGet < TraitData >("Zoomlin");
+                        tcht.trait = TryGet < TraitData >("Zoomlin");
                         tcht.ignoreSilenced = false;
                     }),
                     };
@@ -796,7 +800,7 @@ namespace WildfrostTheGathering
                     data.allowedCardType.item = true;
                     data.allowedCardType.name = "Item";
                     data.attackGreaterThan = 0;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.applyEqualAmount = true;
                 })
@@ -810,11 +814,11 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Spark Dragon Token");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Spark Dragon Token");
                     data.summonPosition = StatusEffectInstantSummon.Position.InFrontOfOrOtherRow;
                     data.withEffects = new StatusEffectData[]
                     {
-                        wtg.TryGet < StatusEffectInstantSetAttack >("Set Attack"),
+                        TryGet<StatusEffectInstantSetAttack>("Set Attack"),
                     };
                     data.queue = false;
                 })
@@ -837,9 +841,9 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantMultiple>("Increase Attack & Health (No Constraints)");
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Increase Attack & Health (No Constraints)");
                     ScriptableTargetsInHand scriptAmount = ScriptableTargetsInHand.CreateInstance<ScriptableTargetsInHand>();
-                    scriptAmount.hasTrait = wtg.TryGet<TraitData>("Zoomlin");
+                    scriptAmount.hasTrait = TryGet<TraitData>("Zoomlin");
                     data.scriptableAmount = scriptAmount;
                     data.applyEqualAmount = true;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
@@ -857,17 +861,17 @@ namespace WildfrostTheGathering
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
                             tcht.not = true;
-                            tcht.trait = wtg.TryGet < TraitData >("Noomlin");
+                            tcht.trait = TryGet<TraitData>("Noomlin");
                             tcht.ignoreSilenced = false;
                         }),
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
                             tcht.not = true;
-                            tcht.trait = wtg.TryGet < TraitData >("Zoomlin");
+                            tcht.trait = TryGet<TraitData>("Zoomlin");
                             tcht.ignoreSilenced = false;
                         }),
                     };
-                    data.trait = wtg.TryGet<TraitData>("Zoomlin");
+                    data.trait = TryGet<TraitData>("Zoomlin");
                 })
                 );
 
@@ -880,7 +884,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
 
                     data.targetConstraints = new TargetConstraint[]
@@ -888,24 +892,24 @@ namespace WildfrostTheGathering
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
                                 tcht.not = true;
-                                tcht.trait = wtg.TryGet < TraitData >("Noomlin");
+                                tcht.trait = TryGet<TraitData>("Noomlin");
                                 tcht.ignoreSilenced = false;
                             }),
                                 new Scriptable<TargetConstraintHasStatus>(tchs =>
                             {
                                 tchs.not = true;
-                                tchs.status = wtg.TryGet < StatusEffectFreeAction >("Free Action");
+                                tchs.status = TryGet<StatusEffectFreeAction>("Free Action");
                             }),
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
                                 tcht.not = true;
-                                tcht.trait = wtg.TryGet < TraitData >("Zoomlin");
+                                tcht.trait = TryGet < TraitData >("Zoomlin");
                                 tcht.ignoreSilenced = false;
                             }),
                                 new Scriptable<TargetConstraintHasStatus>(tchs =>
                             {
                                 tchs.not = true;
-                                tchs.status = wtg.TryGet < StatusEffectFreeAction >("Free Action (Zoomlin)");
+                                tchs.status = TryGet < StatusEffectFreeAction >("Free Action (Zoomlin)");
                             }),
                     };
                 })
@@ -927,7 +931,7 @@ namespace WildfrostTheGathering
                             tciu.mustBeMiniboss = true;
                         }),
                     };
-                    data.trait = wtg.TryGet<TraitData>("Unplayable");
+                    data.trait = TryGet<TraitData>("Unplayable");
                 })
                 );
 
@@ -948,7 +952,7 @@ namespace WildfrostTheGathering
                                     tciu.mustBeMiniboss = true;
                                 }),
                     };
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Temporary Unplayable");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Unplayable");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -969,7 +973,7 @@ namespace WildfrostTheGathering
                 .WithText("Gain <{a}><keyword=spice>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSpice>("Spice");
+                    data.effectToApply = TryGet<StatusEffectSpice>("Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.waitForAnimationEnd = true;
                 })
@@ -982,13 +986,13 @@ namespace WildfrostTheGathering
                 .WithTextInsert($"<keyword={wtg.GUID}.flying>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDrawn>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintIsFeatureOnBoard>(tcifob =>
                             {
                                 tcifob.allies = true;
-                                tcifob.hasTrait = wtg.TryGet < TraitData >("Flying");
+                                tcifob.hasTrait = TryGet < TraitData >("Flying");
                                 tcifob.requiredAmount = 2;
                             }),
                     };
@@ -1007,13 +1011,13 @@ namespace WildfrostTheGathering
                 {
                     ScriptableFixedAmount scriptAmount = ScriptableFixedAmount.CreateInstance<ScriptableFixedAmount>();
                     scriptAmount.amount = 2;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintIsFeatureOnBoard>(tcifob =>
                             {
                                 tcifob.allies = true;
-                                tcifob.hasTrait = wtg.TryGet < TraitData >("Flying");
+                                tcifob.hasTrait = TryGet < TraitData >("Flying");
                                 tcifob.requiredAmount = 2;
                             }),
                     };
@@ -1033,7 +1037,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
                     ScriptableEqualToCounter scriptAmount = ScriptableEqualToCounter.CreateInstance<ScriptableEqualToCounter>();
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Target;
                     data.applyEqualAmount = true;
                     data.scriptableAmount = scriptAmount;
@@ -1050,7 +1054,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectBonusDamageEqualToCardsWithTrait>(data =>
                 {
                     data.doCheckName = false;
-                    data.checkTrait = wtg.TryGet<TraitData>("Zoomlin");
+                    data.checkTrait = TryGet<TraitData>("Zoomlin");
                 })
                 );
 
@@ -1063,19 +1067,19 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSpice>("Spice");
+                    data.effectToApply = TryGet<StatusEffectSpice>("Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
-                                tcht.trait = wtg.TryGet < TraitData >("Flying");
+                                tcht.trait = TryGet < TraitData >("Flying");
                                 tcht.ignoreSilenced = false;
                             }),
                     };
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
-                    scriptAmount.hasTrait = wtg.TryGet<TraitData>("Flying");
+                    scriptAmount.hasTrait = TryGet<TraitData>("Flying");
                     scriptAmount.mult = 2;
                     data.scriptableAmount = scriptAmount;
                     data.applyEqualAmount = true;
@@ -1091,7 +1095,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Target;
                     ScriptableCurrentHealth scriptAmount = ScriptableCurrentHealth.CreateInstance<ScriptableCurrentHealth>();
                     scriptAmount.multiplier = -1;
@@ -1117,7 +1121,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand");
+                    data.effectToApply = TryGet<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1129,31 +1133,31 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXMultipleInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomCardInHand;
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
                                 tcht.not = true;
-                                tcht.trait = wtg.TryGet < TraitData >("Noomlin");
+                                tcht.trait = TryGet < TraitData >("Noomlin");
                                 tcht.ignoreSilenced = false;
                             }),
                             new Scriptable<TargetConstraintHasStatus>(tchs =>
                             {
                                 tchs.not = true;
-                                tchs.status = wtg.TryGet < StatusEffectFreeAction >("Free Action");
+                                tchs.status = TryGet < StatusEffectFreeAction >("Free Action");
                             }),
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
                                 tcht.not = true;
-                                tcht.trait = wtg.TryGet < TraitData >("Zoomlin");
+                                tcht.trait = TryGet < TraitData >("Zoomlin");
                                 tcht.ignoreSilenced = false;
                             }),
                             new Scriptable<TargetConstraintHasStatus>(tchs =>
                             {
                                 tchs.not = true;
-                                tchs.status = wtg.TryGet < StatusEffectFreeAction >("Free Action (Zoomlin)");
+                                tchs.status = TryGet < StatusEffectFreeAction >("Free Action (Zoomlin)");
                             }),
                     };
                 })
@@ -1168,7 +1172,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectWhileActiveXOnce>("Ongoing While Active Allies Gain Spark");
+                    data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing While Active Allies Gain Spark");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1184,10 +1188,10 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                                wtg.TryGet < KeywordData >("Active"),
+                                TryGet < KeywordData >("Active"),
                     };
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectSafeTemporaryTrait>("Temporary Spark");
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Spark");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Hand;
                 })
                 );
@@ -1213,7 +1217,7 @@ namespace WildfrostTheGathering
                                     };
                                 })
                     };
-                    data.trait = wtg.TryGet<TraitData>("Spark");
+                    data.trait = TryGet<TraitData>("Spark");
                 })
                 );
 
@@ -1226,7 +1230,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectHaltXOnce>("Ongoing Halt Spice");
+                    data.effectToApply = TryGet<StatusEffectHaltXOnce>("Ongoing Halt Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1240,7 +1244,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectHaltXOnce>(data =>
                 {
-                    data.effectToHalt = wtg.TryGet<StatusEffectSpice>("Spice");
+                    data.effectToHalt = TryGet<StatusEffectSpice>("Spice");
                     data.eventPriority = -99999;
                     data.ignoreSilence = false;
                 })
@@ -1254,7 +1258,7 @@ namespace WildfrostTheGathering
                 .WithText("When destroyed, count down your leader by <{a}>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                    data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
@@ -1273,12 +1277,12 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXOnCardPlayedUpdateDesc>("On Card Played Add Treasure To Hand Update Desc");
+                    data.effectToApply = TryGet<StatusEffectApplyXOnCardPlayedUpdateDesc>("On Card Played Add Treasure To Hand Update Desc");
                     data.affectsSelf = false;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AlliesInRow;
                     data.hiddenKeywords = new KeywordData[]
                     {
-                            wtg.TryGet < KeywordData >("Active"),
+                            TryGet < KeywordData >("Active"),
                     };
                     data.applyConstraints = new TargetConstraint[]
                     {
@@ -1304,7 +1308,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayedUpdateDesc>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.queue = true;
                     data.separateActions = true;
@@ -1320,7 +1324,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                    data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontEnemy;
                 })
                 );
@@ -1333,7 +1337,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                    data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AlliesInRow;
                 })
                 );
@@ -1347,7 +1351,7 @@ namespace WildfrostTheGathering
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Noomlin");
+                    data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Noomlin");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Hand;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
@@ -1355,7 +1359,7 @@ namespace WildfrostTheGathering
                             new Scriptable<TargetConstraintIsUnit>(),
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
-                                tcht.trait = wtg.TryGet < TraitData >("Flying");
+                                tcht.trait = TryGet < TraitData >("Flying");
                                 tcht.ignoreSilenced = false;
                             }),
                     };
@@ -1371,7 +1375,7 @@ namespace WildfrostTheGathering
                 .WithText("Count down a random enemy's <keyword=counter> by <{a}>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
+                    data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
                 })
                 );
@@ -1387,16 +1391,16 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                            wtg.TryGet < KeywordData >("Active"),
+                            TryGet < KeywordData >("Active"),
                     };
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
+                    data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
-                                tcht.trait = wtg.TryGet < TraitData >("Flying");
+                                tcht.trait = TryGet < TraitData >("Flying");
                                 tcht.ignoreSilenced = false;
                             }),
                     };
@@ -1413,17 +1417,17 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                            wtg.TryGet < KeywordData >("Active"),
+                            TryGet < KeywordData >("Active"),
                     };
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectOngoingAttack>("Ongoing Reduce Attack");
+                    data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Reduce Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
                                 tcht.not = true;
-                                tcht.trait = wtg.TryGet < TraitData >("Flying");
+                                tcht.trait = TryGet < TraitData >("Flying");
                                 tcht.ignoreSilenced = false;
                             }),
                     };
@@ -1439,7 +1443,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenUnitIsKilled>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.queue = true;
                     data.enemy = true;
@@ -1456,9 +1460,9 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSpice>("Spice");
+                    data.effectToApply = TryGet<StatusEffectSpice>("Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { wtg.TryGet<CardData>("treasure") };
+                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
                 })
                 );
 
@@ -1473,10 +1477,10 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                                wtg.TryGet < KeywordData >("Active"),
+                                TryGet < KeywordData >("Active"),
                     };
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
+                    data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
                 })
                 );
@@ -1491,12 +1495,12 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
                 {
                     data.eventPriority = 10;
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXWhenDrawn>("When Drawn Gain Zoomlin");
+                    data.effectToApply = TryGet<StatusEffectApplyXWhenDrawn>("When Drawn Gain Zoomlin");
                     data.applyConstraints = new TargetConstraint[]
                     {
                             new Scriptable<TargetConstraintHasTrait>(tcht =>
                             {
-                                tcht.trait = wtg.TryGet < TraitData >("Flying");
+                                tcht.trait = TryGet < TraitData >("Flying");
                                 tcht.ignoreSilenced = false;
                             }),
                             new Scriptable<TargetConstraintIsUnit>(tciu =>
@@ -1515,7 +1519,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Fragile");
+                    data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Fragile");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.targetConstraints = new TargetConstraint[]
                     {
@@ -1544,7 +1548,7 @@ namespace WildfrostTheGathering
                             }),
                             new Scriptable<TargetConstraintHasHealth>(),
                     };
-                    data.trait = wtg.TryGet<TraitData>("Fragile");
+                    data.trait = TryGet<TraitData>("Fragile");
                 })
                 );
 
@@ -1557,15 +1561,15 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                            wtg.TryGet < KeywordData >("Copy"),
+                            TryGet < KeywordData >("Copy"),
                     };
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Plep");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Plep");
                     data.summonCopy = true;
                     data.withEffects = new StatusEffectData[]
                     {
-                            wtg.TryGet < StatusEffectInstantSetHealth >("Set Health"),
-                            wtg.TryGet < StatusEffectApplyXInstant >("Instant Gain Fragile")
+                            TryGet < StatusEffectInstantSetHealth >("Set Health"),
+                            TryGet < StatusEffectApplyXInstant >("Instant Gain Fragile")
                     };
 
                     data.targetConstraints = new TargetConstraint[]
@@ -1587,7 +1591,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Copy With X Health And Fragile");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Copy With X Health And Fragile");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyInFrontOf;
 
                 })
@@ -1603,12 +1607,12 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
                 {
                     data.summonQueue = true;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Big Dragon Token With X Health");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Big Dragon Token With X Health");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = wtg.TryGet<TraitData>("Flying");
-                    data.excludedCards = new List<CardData> { wtg.TryGet<CardData>("bigDragonToken") };
+                    data.wantedTrait = TryGet<TraitData>("Flying");
+                    data.excludedCards = new List<CardData> { TryGet<CardData>("bigDragonToken") };
                 })
                 );
 
@@ -1620,11 +1624,11 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.targetSummon = wtg.TryGet<StatusEffectSummon>("Summon Big Dragon Token");
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Big Dragon Token");
                     data.summonPosition = StatusEffectInstantSummon.Position.InFrontOfOrOtherRow;
                     data.withEffects = new StatusEffectData[]
                     {
-                            wtg.TryGet < StatusEffectInstantSetHealth >("Set Health"),
+                            TryGet < StatusEffectInstantSetHealth >("Set Health"),
                     };
                 })
                 );
@@ -1657,9 +1661,9 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = wtg.TryGet<CardData>("bigDragonToken");
-                    data.gainTrait = wtg.TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
-                    data.setCardType = wtg.TryGet<CardType>("Summoned");
+                    data.summonCard = TryGet<CardData>("bigDragonToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
@@ -1673,10 +1677,10 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.allowedTraits = new TraitData[1] { wtg.TryGet<TraitData>("whycats.wildfrost.wildfrostthegathering.Flying") };
+                    data.allowedTraits = new TraitData[1] { TryGet<TraitData>("whycats.wildfrost.wildfrostthegathering.Flying") };
                     data.countsSelf = true;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.whileActive = true;
                 })
                 );
@@ -1690,11 +1694,11 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = wtg.TryGet<TraitData>("Flying");
+                    data.wantedTrait = TryGet<TraitData>("Flying");
                 })
                 );
 
@@ -1706,7 +1710,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXPostAttack>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectApplyXMultipleInstant>("Intstant Damage Frontmost Enemy Twice");
+                    data.effectToApply = TryGet<StatusEffectApplyXMultipleInstant>("Intstant Damage Frontmost Enemy Twice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1718,7 +1722,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXMultipleInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectSnow>("Snow");
+                    data.effectToApply = TryGet<StatusEffectSnow>("Snow");
                     data.dealDamage = true;
                     data.numTimes = 2;
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontEnemy;
@@ -1758,7 +1762,7 @@ namespace WildfrostTheGathering
                         new Scriptable<TargetConstraintOnBoard>(),
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
-                            tcht.trait = wtg.TryGet<TraitData>("Flying");
+                            tcht.trait = TryGet<TraitData>("Flying");
                             tcht.ignoreSilenced = false;
                         }),
                     };
@@ -1775,8 +1779,8 @@ namespace WildfrostTheGathering
                 {
                     data.applyXEffects = new StatusEffectApplyXInstant[]
                     {
-                        wtg.TryGet<StatusEffectApplyXInstant>("Instant Draw Equal To Health Minus 1"),
-                        wtg.TryGet<StatusEffectApplyXInstant>("Instant Set Own Health")
+                        TryGet<StatusEffectApplyXInstant>("Instant Draw Equal To Health Minus 1"),
+                        TryGet<StatusEffectApplyXInstant>("Instant Set Own Health")
                     };
                 })
                 );
@@ -1789,7 +1793,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.effectToApply = wtg.TryGet<StatusEffectInstant>("Set Max Health");
+                    data.effectToApply = TryGet<StatusEffectInstant>("Set Max Health");
                 })
                 );
 
@@ -1800,7 +1804,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
                     ScriptableCurrentHealthPlusConstant scriptAmount = ScriptableObject.CreateInstance<ScriptableCurrentHealthPlusConstant>();
                     scriptAmount.constant = -1;
                     data.scriptableAmount = scriptAmount;
@@ -1817,7 +1821,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantIncreaseMaxCounter>("Increase Max Counter");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseMaxCounter>("Increase Max Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Enemies;
                 })
                 );
@@ -1841,7 +1845,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantTutor>("Instant Tutor Card From Deck To Hand");
+                    data.effectToApply = TryGet<StatusEffectInstantTutor>("Instant Tutor Card From Deck To Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1869,7 +1873,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantTutor>("Instant Destroy Card In Deck");
+                    data.effectToApply = TryGet<StatusEffectInstantTutor>("Instant Destroy Card In Deck");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
@@ -1897,7 +1901,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.effectToApply = wtg.TryGet<StatusEffectInstantApplyToAllInDeck>("Instant Destroy Non Crown Deck And Discard");
+                    data.effectToApply = TryGet<StatusEffectInstantApplyToAllInDeck>("Instant Destroy Non Crown Deck And Discard");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );

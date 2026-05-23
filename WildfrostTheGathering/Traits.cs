@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using static WildfrostTheGathering.WildfrostTheGathering;
 
 namespace WildfrostTheGathering
 {
@@ -23,16 +24,16 @@ namespace WildfrostTheGathering
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Prioritize Bosses") };
                     trait.overrides = new TraitData[]
                     {
-                                wtg.TryGet<TraitData>("Aimless"),
-                                wtg.TryGet < TraitData >("Barrage"),
-                                wtg.TryGet < TraitData >("Longshot"),
-                                wtg.TryGet < TraitData >("Fireball")
+                                TryGet<TraitData>("Aimless"),
+                                TryGet < TraitData >("Barrage"),
+                                TryGet < TraitData >("Longshot"),
+                                TryGet < TraitData >("Fireball")
                     };
-                    TraitData aimless = wtg.TryGet<TraitData>("Aimless");
+                    TraitData aimless = TryGet<TraitData>("Aimless");
                     aimless.overrides = aimless.overrides.With(trait);
-                    TraitData barrage = wtg.TryGet<TraitData>("Barrage");
+                    TraitData barrage = TryGet<TraitData>("Barrage");
                     barrage.overrides = barrage.overrides.With(trait);
-                    TraitData longshot = wtg.TryGet<TraitData>("Longshot");
+                    TraitData longshot = TryGet<TraitData>("Longshot");
                     longshot.overrides = longshot.overrides.With(trait);
                 })
                 );
@@ -47,16 +48,16 @@ namespace WildfrostTheGathering
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Random Enemy For Zoomlin") };
                     trait.overrides = new TraitData[]
                     {
-                                wtg.TryGet < TraitData >("Aimless"),
-                                wtg.TryGet < TraitData >("Longshot"),
-                                wtg.TryGet < TraitData >("Barrage"),
-                                wtg.TryGet < TraitData >("Flying")
+                                TryGet < TraitData >("Aimless"),
+                                TryGet < TraitData >("Longshot"),
+                                TryGet < TraitData >("Barrage"),
+                                TryGet < TraitData >("Flying")
                     };
-                    TraitData aimless = wtg.TryGet<TraitData>("Aimless");
+                    TraitData aimless = TryGet<TraitData>("Aimless");
                     aimless.overrides = aimless.overrides.With(trait);
-                    TraitData barrage = wtg.TryGet<TraitData>("Barrage");
+                    TraitData barrage = TryGet<TraitData>("Barrage");
                     barrage.overrides = barrage.overrides.With(trait);
-                    TraitData longshot = wtg.TryGet<TraitData>("Longshot");
+                    TraitData longshot = TryGet<TraitData>("Longshot");
                     longshot.overrides = longshot.overrides.With(trait);
                 })
                 );
@@ -67,8 +68,8 @@ namespace WildfrostTheGathering
                 .Create("Unplayable")
                 .SubscribeToAfterAllBuildEvent((trait) =>
                 {
-                    trait.keyword = wtg.TryGet<KeywordData>("unplayable");
-                    trait.effects = new StatusEffectData[] { wtg.TryGet<WildfrostTheGathering.StatusEffectUnplayable>("Unplayable") };
+                    trait.keyword = TryGet<KeywordData>("unplayable");
+                    trait.effects = new StatusEffectData[] { TryGet<WildfrostTheGathering.StatusEffectUnplayable>("Unplayable") };
                 })
                 );
 
@@ -78,7 +79,18 @@ namespace WildfrostTheGathering
                 .Create("Eternal")
                 .SubscribeToAfterAllBuildEvent((trait) =>
                 {
-                    trait.keyword = wtg.TryGet<KeywordData>("eternal");
+                    trait.keyword = TryGet<KeywordData>("eternal");
+                    trait.effects = new StatusEffectData[] { };
+                })
+                );
+
+            // Eternal
+            assets.Add(
+                new TraitDataBuilder(wtg)
+                .Create("Conspiracy")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = TryGet<KeywordData>("conspiracy");
                     trait.effects = new StatusEffectData[] { };
                 })
                 );

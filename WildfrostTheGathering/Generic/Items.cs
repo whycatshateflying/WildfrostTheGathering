@@ -519,7 +519,8 @@ namespace WildfrostTheGathering.Generic
                     {
                         data.traits = new List<CardData.TraitStacks>
                         {
-                                wtg.TStack("Consume", 1),
+                            wtg.TStack("Consume", 1),
+                            wtg.TStack("Conspiracy", 1),
                         };
                         data.attackEffects = new CardData.StatusEffectStacks[]
                         {
@@ -546,6 +547,7 @@ namespace WildfrostTheGathering.Generic
                         data.traits = new List<CardData.TraitStacks>
                         {
                             wtg.TStack("Consume", 1),
+                            wtg.TStack("Conspiracy", 1),
                         };
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {
@@ -617,6 +619,7 @@ namespace WildfrostTheGathering.Generic
                         data.traits = new List<CardData.TraitStacks>
                         {
                             wtg.TStack("Consume", 1),
+                            wtg.TStack("Conspiracy", 1),
                         };
                         data.startWithEffects = new CardData.StatusEffectStacks[]
                         {

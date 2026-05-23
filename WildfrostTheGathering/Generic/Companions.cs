@@ -29,6 +29,8 @@ namespace WildfrostTheGathering.Generic
                     {
                                     wtg.SStack("Snow", 2),
                     };
+                    data.greetMessages = new string[2] { "Don’t fear the darkness. Fear what it hides",
+                                                        "Sleep doesn’t always mean rest"};
                 })
                 );
             Debug.Log("[WTG] Generic companions loaded!");

@@ -72,6 +72,15 @@ namespace WildfrostTheGathering
                 .WithDescription("Cannot be targeted|Remove after triggering")
                 .WithCanStack(false)
                 );
+
+            // Consipracy
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("conspiracy")
+                .WithTitle("Conspiracy")
+                .WithShowName(true)
+                .WithDescription("Begins with a crown")
+                .WithCanStack(false)
+                );
             Debug.Log("[WTG] Keywords loaded!");
         }
     }

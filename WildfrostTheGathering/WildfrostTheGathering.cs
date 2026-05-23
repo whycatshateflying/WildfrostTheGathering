@@ -1,5 +1,4 @@
-﻿using AbsentAvalanche;
-using DeadExtensions;
+﻿using DeadExtensions;
 using Deadpan.Enums.Engine.Components.Modding;
 using HarmonyLib;
 using System;
@@ -20,7 +19,7 @@ namespace WildfrostTheGathering
         }
         public static WildfrostTheGathering Instance;
 
-        public static List<object> assets = new List<object>();  // The list of builders that will build the CardData/StatusEffectData
+        public static List<object> assets = new();  // The list of builders that will build the CardData/StatusEffectData
 
         private bool preLoaded = false;  // Used to prevent redundantly reconstructing the data. Not truly necessary.
 
@@ -111,9 +110,9 @@ namespace WildfrostTheGathering
             {
                 foreach (Entity card in Battle.instance.minibosses)
                 {
-                    // Debug.Log("[WildfrostTheGathering] " + card.name);
-                    if (card.owner != entity.owner && Battle.IsOnBoard(card))
+                    if (card.owner != entity.owner && Battle.IsOnBoard(card) && card.canBeHit)
                     {
+                        Debug.Log("[WildfrostTheGathering] " + entity.name);
                         return true;
                     }
                 }
@@ -121,31 +120,17 @@ namespace WildfrostTheGathering
 
             }
 
-            /*
-            private Entity[] FindValidBosses(Entity entity)  // Michael C's code
-            {
-
-               List<Entity> validBosses = new List<Entity>();
-               foreach (Entity card in Battle.instance.minibosses)
-               {
-                   if (card.owner != entity.owner && Battle.IsOnBoard(card))
-                   {
-                       validBosses.Add(card);
-                   }
-               }
-               return validBosses.ToArray();
-            }*/
             private void AddBossTargets(Entity entity, HashSet<Entity> targets, int rowIndex)
             {
                 // Adds to targets the first boss enemy in row rowIndex
                 List<Entity> enemiesInRow = entity.GetEnemiesInRow(rowIndex);
                 Entity entity2 = null;
-                foreach (Entity item in enemiesInRow)
+                foreach (Entity enemy in enemiesInRow)
                 {
-                    if ((bool)item && item.enabled && item.alive && item.canBeHit && item.data.cardType.miniboss)
+                    if ((bool)enemy && enemy.enabled && enemy.alive && enemy.canBeHit && enemy.data.cardType.miniboss)
                     {
                         // Debug.Log("[WildfrostTheGathering] " + item + " is a target!");
-                        entity2 = item;
+                        entity2 = enemy;
                         break;
                     }
                 }
@@ -674,8 +659,8 @@ namespace WildfrostTheGathering
             public int attackGreaterThan = -100;  // -100 is "don't check". If I make it nullable, it's always null :/
             public CardType allowedCardType;
             public bool countsSelf = false;
-            public CardData[] allowedCards = Array.Empty<CardData>();
-            public TraitData[] allowedTraits = Array.Empty<TraitData>();
+            public CardData[] allowedCards = [];
+            public TraitData[] allowedTraits = [];
             public Hit _hackyHit;
 
             public override void Init()
@@ -689,21 +674,21 @@ namespace WildfrostTheGathering
 
             public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
             {
-                Debug.Log("[WTG] " + attackGreaterThan + " " + (attackGreaterThan != -100).ToString());
-                Debug.Log("[WildfrostTheGathering] " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn and I've been updated");
+                // Debug.Log("[WTG] " + attackGreaterThan + " " + (attackGreaterThan != -100).ToString());
+                Debug.Log("[WildfrostTheGathering] (" + target.name + ") " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn and I've been updated");
                 if (whileActive && !Battle.IsOnBoard(target))
                 {
                     Debug.Log("[WildfrostTheGathering] ...but I'm not active yet");
                     return false;
                 }
-                if (allowedTimes > 0 && numTimesPlayed++ > allowedTimes)
+                if (allowedTimes > 0 && numTimesPlayed + 1> allowedTimes)
                 {
                     Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
                     return false;
                 }
                 if (!target.enabled)
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but was not enabled");
+                    Debug.Log("[WildfrostTheGathering] ...but I was not enabled");
                     return false;
                 }
                 if (!countsSelf && target == entity)
@@ -734,7 +719,12 @@ namespace WildfrostTheGathering
                 _hackyHit = new Hit(entity, null);
                 CardData[] array2 = allowedCards;
                 Debug.Log("[WildfrostTheGathering] " + array2 + " || " + array2.Length + " || " + allowedCards.ToList().Any((CardData c) => c.name == entity.data.name));
-                return array2 == null || array2.Length <= 0 || allowedCards.ToList().Any((CardData c) => c.name == entity.data.name);
+                if (array2 == null || array2.Length <= 0 || allowedCards.ToList().Any((CardData c) => c.name == entity.data.name))
+                {
+                    numTimesPlayed++;
+                    return true;
+                }
+                return false;
             }
 
             public new IEnumerator Check(Entity entity, Entity[] targets)
@@ -1096,164 +1086,7 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Cause while active ally behind is broken otherwise. Thanks While Active
-        /*public class StatusEffectWhileActiveXUpdatesOnOtherMove : StatusEffectWhileActiveX
-        {
-            public override IEnumerator CardMove(Entity entity)
-            {
-                // Literally just the old code but add a call to FindContainers
-                if (target == entity)
-                {
-                    yield return base.CardMove(entity);  // For code tidiness
-                }
-                else
-                {
-                    if (!active)
-                    {
-                        yield break;
-                    }
-
-                    if (AffectsSlot())
-                    {
-                        FindContainersClone();
-                        CardContainer[] other = containersToAffect.Select((CardContainer a) => a.Group).ToArray();
-                        if (entity.containers.ContainsAny(other) || entity.preContainers.ContainsAny(other))
-                        {
-                            yield return Deactivate();
-                            yield return Activate();
-                        }
-                    }
-                    else if (affected.Contains(entity))
-                    {
-                        if (!containersToAffect.ContainsAny(entity.containers))
-                        {
-                            yield return UnAffect(entity);
-                        }
-                    }
-                    else if (containersToAffect.ContainsAny(entity.containers))
-                    {
-                        yield return Affect(entity);
-                    }
-                }
-            }
-
-            public void FindContainersClone()
-            {
-                // containersToAffect.Clear();  // This breaks it for some reason... Other than that, no changes
-                Character opponent = Battle.GetOpponent(target.owner);
-                int[] rowIndices = Battle.instance.GetRowIndices(target);
-                affectsSelf = AppliesTo(ApplyToFlags.Self);
-                if (AppliesTo(ApplyToFlags.Allies))
-                {
-                    containersToAffect.AddRange(Battle.instance.GetRows(target.owner));
-                }
-                else if (AppliesTo(ApplyToFlags.AlliesInRow))
-                {
-                    int[] array = rowIndices;
-                    foreach (int rowIndex in array)
-                    {
-                        containersToAffect.Add(Battle.instance.GetRow(target.owner, rowIndex));
-                    }
-                }
-                else
-                {
-                    if (AppliesTo(ApplyToFlags.FrontAlly))
-                    {
-                        int[] array = rowIndices;
-                        foreach (int rowIndex2 in array)
-                        {
-                            if (Battle.instance.GetRow(target.owner, rowIndex2) is CardSlotLane cardSlotLane)
-                            {
-                                CardSlot value = cardSlotLane.slots.FirstOrDefault((CardSlot a) => !a.Empty);
-                                containersToAffect.AddIfNotNull(value);
-                            }
-                        }
-                    }
-
-                    if (AppliesTo(ApplyToFlags.BackAlly))
-                    {
-                        int[] array = rowIndices;
-                        foreach (int rowIndex3 in array)
-                        {
-                            if (Battle.instance.GetRow(target.owner, rowIndex3) is CardSlotLane cardSlotLane2)
-                            {
-                                CardSlot value2 = cardSlotLane2.slots.LastOrDefault((CardSlot a) => !a.Empty);
-                                containersToAffect.AddIfNotNull(value2);
-                            }
-                        }
-                    }
-
-                    if (AppliesTo(ApplyToFlags.AllyInFrontOf))
-                    {
-                        int[] array = rowIndices;
-                        foreach (int rowIndex4 in array)
-                        {
-                            if (!(Battle.instance.GetRow(target.owner, rowIndex4) is CardSlotLane cardSlotLane3))
-                            {
-                                continue;
-                            }
-
-                            for (int num = cardSlotLane3.IndexOf(target) - 1; num >= 0; num--)
-                            {
-                                CardSlot cardSlot = cardSlotLane3.slots[num];
-                                if (!cardSlot.Empty)
-                                {
-                                    containersToAffect.Add(cardSlot);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (AppliesTo(ApplyToFlags.AllyBehind))
-                    {
-                        int[] array = rowIndices;
-                        foreach (int rowIndex5 in array)
-                        {
-                            if (!(Battle.instance.GetRow(target.owner, rowIndex5) is CardSlotLane cardSlotLane4))
-                            {
-                                continue;
-                            }
-
-                            for (int num2 = cardSlotLane4.IndexOf(target) + 1; num2 < cardSlotLane4.slots.Count; num2++)
-                            {
-                                CardSlot cardSlot2 = cardSlotLane4.slots[num2];
-                                if (!cardSlot2.Empty)
-                                {
-                                    containersToAffect.Add(cardSlot2);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (AppliesTo(ApplyToFlags.Enemies))
-                {
-                    containersToAffect.AddRange(Battle.instance.GetRows(opponent));
-                }
-                else if (AppliesTo(ApplyToFlags.EnemiesInRow))
-                {
-                    int[] array = rowIndices;
-                    foreach (int rowIndex6 in array)
-                    {
-                        containersToAffect.Add(Battle.instance.GetRow(opponent, rowIndex6));
-                    }
-                }
-
-                if (AppliesTo(ApplyToFlags.Hand) && (bool)References.Player)
-                {
-                    containersToAffect.AddIfNotNull(References.Player.handContainer);
-                }
-
-                if (AppliesTo(ApplyToFlags.EnemyHand) && (bool)opponent)
-                {
-                    containersToAffect.AddIfNotNull(opponent.handContainer);
-                }
-            }
-        }*/
-
-        // If this is applied to a card, then it'll update whenever something that might happen does happen
+        // idk why this disappeared... anyways apply x but when this is applied or things move update the desc
         public class StatusEffectApplyXOnCardPlayedUpdateDesc : StatusEffectApplyXOnCardPlayed
         {
             public override bool RunEndEvent()
@@ -1409,7 +1242,7 @@ namespace WildfrostTheGathering
             }
         }
 
-        // Doomsday code
+        // Doomsday code. Technically should work with other effects but haven't tested it yet
         public class StatusEffectInstantApplyToAllInDeck : StatusEffectInstant
         {
             public bool inDeck = false;
@@ -1432,8 +1265,6 @@ namespace WildfrostTheGathering
             }
             private void AddToAllCardsInList(List<Entity> cards)
             {
-                Debug.Log("[WTG] Beep");
-                List<Entity> theList = new List<Entity>();
                 foreach (Entity entity in cards)
                 {
                     if (includeCrowned || !entity.data.HasCrown)
@@ -1568,7 +1399,7 @@ namespace WildfrostTheGathering
 
                         foreach (var entities in InPettyRandomOrder(drawContainer).Take(amount))
                         {
-                            var cardData = Absent.GetCard(entities._data.name).Clone();
+                            var cardData = TryGet<CardData>(entities._data.name).Clone();
                             var card = CardManager.Get(cardData, Battle.instance.playerCardController, References.Player,
                                 true,
                                 true);
@@ -1613,7 +1444,7 @@ namespace WildfrostTheGathering
                 amount = amount == 0 ? customCardList.Length : amount;
                 foreach (var cardName in InPettyRandomOrder(customCardList).Take(amount))
                 {
-                    var cardData = Absent.GetCard(cardName).Clone();
+                    var cardData = TryGet<CardData>(cardName).Clone();
                     var card = CardManager.Get(cardData, Battle.instance.playerCardController, References.Player,
                         true,
                         true);
@@ -1623,7 +1454,7 @@ namespace WildfrostTheGathering
 
             private void PredicateContainer()
             {
-                var predicate1 = Absent.GetStatusOf<StatusEffectInstantTutor>(name).predicate;
+                var predicate1 = TryGet<StatusEffectInstantTutor>(name).predicate;
                 if (predicate1 is null)
                     throw new ArgumentException("No predicate found");
 
@@ -1829,12 +1660,6 @@ namespace WildfrostTheGathering
             }
         }
 
-        // TODO: Chekc interaction between multiple when played effects (specifically AM with its count)
-        // TODO: Keyword conspiracy
-        // TODO: Let companions with flying hit normally if all bosses are phased out
-        // TODO: Remove all mentions to Absent in the tutor code
-        // TODO: Add greetmessage for fear of sleep paralysis
-        // TODO: Make Skullclamp effect happen before hit
         // TODO: Make Delayed Blast Fireball not clear all spice after played
         // TODO: Make beatable ascendeds
         // TODO: Make Lathliss not summon if precontainer is null. That happens in ascended fg
@@ -1844,6 +1669,7 @@ namespace WildfrostTheGathering
         // TODO: Make Eyedata for the ascendeds
         // TODO: Make Manaform Hellkite+Guttersnipe not trigger on each hit of frenzy
         // TODO: Make Manaform Hellkite count current attack
+        // TODO: Make the enabled exist better for apply to all deck (If possible. Double check with miya to see how)
 
         private void CreateModAssets()
         {
@@ -2169,21 +1995,23 @@ namespace WildfrostTheGathering
             Events.OnEntityCreated -= FixImage;
         }
 
-        public T TryGet<T>(string name) where T : DataFile
+        // Taken from Absent Avalanche. Likely Hopeful's code tho from the tutorial. Check them both out anyways they're cool people :3
+        public static T TryGet<T>(string datafileName) where T : DataFile
         {
-            T data;
+            Debug.Log("[WTG] Finding " + datafileName);
+            T dataFile;
             if (typeof(StatusEffectData).IsAssignableFrom(typeof(T)))
-                data = base.Get<StatusEffectData>(name) as T;
+                dataFile = Instance.Get<StatusEffectData>(datafileName) as T;
             else if (typeof(KeywordData).IsAssignableFrom(typeof(T)))
-                data = (AddressableLoader.Get<KeywordData>("KeywordData", Extensions.PrefixGUID(name, this))
-                ?? base.Get<KeywordData>(name.ToLower())) as T;
+            {
+                dataFile = Instance.Get<T>(datafileName.ToLower());
+            }
             else
-                data = base.Get<T>(name);
+                dataFile = Instance.Get<T>(datafileName);
 
-            if (data == null)
-                throw new Exception($"TryGet Error: Could not find a [{typeof(T).Name}] with the name [{name}] or [{Extensions.PrefixGUID(name, this)}]");
-
-            return data;
+            return dataFile ??
+                   throw new Exception(
+                       $"TryGet Error: Could not find a [{typeof(T).Name}] with the name [{datafileName}] or [{Extensions.PrefixGUID(datafileName, Instance)}]");
         }
         internal T[] RemoveNulls<T>(T[] data) where T : DataFile
         {
