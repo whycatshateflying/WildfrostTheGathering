@@ -1905,7 +1905,79 @@ namespace WildfrostTheGathering
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
+
+            // Add random card from deck to hand
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectDrawRandomCardWithPredicate>("Instant Random Tutor")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectDrawRandomCardWithPredicate>(data =>
+                {
+                    data.predicate = new Predicate<CardData>(pred =>
+                    {
+                        return pred.cardType.item;
+                    });
+                    data.random = true;
+                    data.discard = true;
+                    data.addEffectStacks = [wtg.SStack("MultiHit", 1)];
+                    data.equalToCount = true;
+                    data.drawNumber = 1;
+                })
+                );
+
+            // Throes of Chaos: On Card Played Random Tutor
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Random Tutor Add Frenzy")
+                .WithText("Draw a random item from your draw or discard pocket to your hand and give it <x{a}><keyword=frenzy>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectDrawRandomCardWithPredicate>("Instant Random Tutor");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.eventPriority = -999;
+                })
+                );
+
+            // Throes of Chaos: You can't play other cards this turn
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Unplayable To Hand")
+                .WithText("You can't play other cards this turn")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Unplayable");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Hand;
+                    data.eventPriority = 10;
+                })
+                );
             Debug.Log("[WTG] Effects loaded!");
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

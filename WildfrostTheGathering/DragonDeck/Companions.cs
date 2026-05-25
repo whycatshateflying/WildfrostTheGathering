@@ -308,10 +308,13 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithValue(45)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
+                    data.traits = new List<CardData.TraitStacks>
+                    {
+                        wtg.TStack("Barrage", 1)
+                    };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
-                            wtg.SStack("On Card Played Destroy Right Treasure In Hand And Draw", 1),
-                            wtg.SStack("MultiHit", 1),
+                        wtg.SStack("On Card Played Destroy Right Treasure In Hand And Draw", 1),
                     };
                     data.greetMessages = new string[1] { "<i>When you lose <b>Jetmir's</b> trust, his family makes sure you lose everything else</i>" };
                 })

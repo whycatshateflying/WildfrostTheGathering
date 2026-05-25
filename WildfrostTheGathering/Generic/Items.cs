@@ -2,6 +2,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using static WildfrostTheGathering.WildfrostTheGathering;
+using System.Runtime.Remoting.Channels;
 
 namespace WildfrostTheGathering.Generic
 {
@@ -658,6 +659,29 @@ namespace WildfrostTheGathering.Generic
                         data.needsTarget = false;
                     })
                     );
+
+            // Throes of Chaos
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateItem("throesOfChaos", "Throes of Chaos")
+                .SetDamage(null)
+                .SetSprites("throes-of-chaos-ikieryluk.png", "item-bg.png")
+                .WithFlavour("When the world is consumed by chaos, the skilled and the foolish are on equal footing")
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.traits = new List<CardData.TraitStacks>
+                    {
+                        wtg.TStack("Noomlin", 1)
+                    };
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
+                    {
+                        wtg.SStack("On Card Played Random Tutor Add Frenzy", 1),
+                        wtg.SStack("On Card Played Unplayable To Hand", 1)
+                    };
+                    data.canPlayOnBoard = false;
+                    data.canPlayOnHand = false;
+                    data.needsTarget = false;
+                })
+                );
             Debug.Log("[WTG] Generic items are loaded!");
         }
     }
