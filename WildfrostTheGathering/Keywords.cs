@@ -13,6 +13,7 @@ namespace WildfrostTheGathering
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Keywords loading!");
+
             // Flying
             assets.Add(
                 new KeywordDataBuilder(wtg)
@@ -81,6 +82,35 @@ namespace WildfrostTheGathering
                 .WithDescription("Begins with a crown")
                 .WithCanStack(false)
                 );
+
+            // Draw Pocket
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("discardpocket")
+                .WithTitle("Discard Pocket")
+                .WithShowName(true)
+                .WithDescription($"Cards without <keyword=consume> go here when played|Shuffles into the Draw Pocket when it runs out")
+                .WithCanStack(false)
+                );
+
+            // Discard Pocket
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("drawpocket")
+                .WithTitle("Draw Pocket")
+                .WithShowName(true)
+                .WithDescription($"Cards are drawn from this pile|When it runs out, the Discard Pocket is shuffled and moved here")
+                .WithCanStack(false)
+                );
+
+            // Unplayable
+            assets.Add(
+                new KeywordDataBuilder(wtg)
+                .Create("trample")
+                .WithTitle("Trample")  // The in-game name for the upgrade.
+                .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                .WithDescription("Deal excess damage to target behind|Does not wrap lanes") //Format is body|note.
+                .WithCanStack(false)  // The keyword does not show its stack number.
+                );
+
             Debug.Log("[WTG] Keywords loaded!");
         }
     }

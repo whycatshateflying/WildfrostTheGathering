@@ -24,10 +24,10 @@ namespace WildfrostTheGathering
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Prioritize Bosses") };
                     trait.overrides = new TraitData[]
                     {
-                                TryGet<TraitData>("Aimless"),
-                                TryGet < TraitData >("Barrage"),
-                                TryGet < TraitData >("Longshot"),
-                                TryGet < TraitData >("Fireball")
+                        TryGet <TraitData>("Aimless"),
+                        TryGet <TraitData>("Barrage"),
+                        TryGet <TraitData>("Longshot"),
+                        TryGet <TraitData>("Fireball")
                     };
                     TraitData aimless = TryGet<TraitData>("Aimless");
                     aimless.overrides = aimless.overrides.With(trait);
@@ -48,10 +48,10 @@ namespace WildfrostTheGathering
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Random Enemy For Zoomlin") };
                     trait.overrides = new TraitData[]
                     {
-                                TryGet < TraitData >("Aimless"),
-                                TryGet < TraitData >("Longshot"),
-                                TryGet < TraitData >("Barrage"),
-                                TryGet < TraitData >("Flying")
+                        TryGet <TraitData>("Aimless"),
+                        TryGet <TraitData>("Longshot"),
+                        TryGet <TraitData>("Barrage"),
+                        TryGet <TraitData>("Flying")
                     };
                     TraitData aimless = TryGet<TraitData>("Aimless");
                     aimless.overrides = aimless.overrides.With(trait);
@@ -73,6 +73,19 @@ namespace WildfrostTheGathering
                 })
                 );
 
+            // Trample
+            assets.Add(
+                new TraitDataBuilder(wtg)
+                .Create("Trample")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = TryGet<KeywordData>("trample");
+                    trait.effects = new StatusEffectData[] { TryGet<WildfrostTheGathering.StatusEffectTrample>("Trample") };
+                    TraitData barrage = TryGet<TraitData>("Barrage");
+                    barrage.overrides = barrage.overrides.With(trait);
+                })
+                );
+
             // Eternal
             assets.Add(
                 new TraitDataBuilder(wtg)
@@ -84,7 +97,7 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Eternal
+            // Conspiracy
             assets.Add(
                 new TraitDataBuilder(wtg)
                 .Create("Conspiracy")
@@ -94,6 +107,7 @@ namespace WildfrostTheGathering
                     trait.effects = new StatusEffectData[] { };
                 })
                 );
+
             Debug.Log("[WTG] Traits loaded!");
         }
     }

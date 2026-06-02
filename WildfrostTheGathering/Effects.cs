@@ -946,11 +946,11 @@ namespace WildfrostTheGathering
                 {
                     data.targetConstraints = new TargetConstraint[]
                     {
-                                new Scriptable<TargetConstraintIsUnit>(tciu =>
-                                {
-                                    tciu.not = true;
-                                    tciu.mustBeMiniboss = true;
-                                }),
+                        new Scriptable<TargetConstraintIsUnit>(tciu =>
+                        {
+                            tciu.not = true;
+                            tciu.mustBeMiniboss = true;
+                        }),
                     };
                     data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Unplayable");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
@@ -1840,7 +1840,7 @@ namespace WildfrostTheGathering
             // Demonic Tutor: Tutor card on play
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Tutor Card From Deck To Hand")
-                .WithText("Add any card from your Draw Pocket to your hand")
+                .WithText($"Add any card from your <keyword={wtg.GUID}.drawpocket> to your hand")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -1868,7 +1868,7 @@ namespace WildfrostTheGathering
             // Advantageous Proclamation: Apply destroy 2 cards in deck
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Destroy 1 Card In Deck")
-                .WithText("Destroy 1 card in your deck")
+                .WithText($"Destroy 1 card in your <keyword={wtg.GUID}.drawpocket>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -1896,7 +1896,7 @@ namespace WildfrostTheGathering
             // Doomsday: On Card Played Destroy Deck And Discard
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Destroy Non Crown Deck And Discard")
-                .WithText("Destroy all cards without <sprite name=crown> in your draw and discard pockets")
+                .WithText($"Destroy all cards without <sprite name=crown> in your your <keyword={wtg.GUID}.drawpocket> and <keyword={wtg.GUID}.discardpocket>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -1928,7 +1928,7 @@ namespace WildfrostTheGathering
             // Throes of Chaos: On Card Played Random Tutor
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Random Tutor Add Frenzy")
-                .WithText("Draw a random item from your draw or discard pocket to your hand and give it <x{a}><keyword=frenzy>")
+                .WithText($"Draw a random item from your <keyword={wtg.GUID}.drawpocket> or <keyword={wtg.GUID}.discardpocket> to your hand and give it <x{{a}}><keyword=frenzy>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -1952,6 +1952,194 @@ namespace WildfrostTheGathering
                     data.eventPriority = 10;
                 })
                 );
+
+            // Mull/nulldrifter: When deployed draw
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployed>("When deployed draw")
+                .WithText("<keyword=draw> <{a}> when deployed")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.whenSelfDeployed = true;
+                })
+                );
+
+            // Deadeye Navigator: Cleanse self and allies
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Cleanse Self And Allies")
+                .WithText("<keyword=cleanse> self and allies")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantCleanse>("Cleanse");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self | StatusEffectApplyX.ApplyToFlags.Allies;
+                })
+                );
+
+            // Beast Whisperer: Draw when ally deployed
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployedNoHand>("When Ally Deployed Draw")
+                .WithText("<keyword=draw> <{a}> whenever an ally is deployed")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHand>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantDraw>("Instant Draw");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.whenSelfDeployed = false;
+                    data.whenAllyDeployed = true;
+                })
+                );
+
+            // Warren Soultrader: Sacrifice ally behind
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Sacrifice Ally Behind Needs Health")
+                .WithText("Kill ally behind")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantKill>("Kill");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                    data.eventPriority = -999;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        TargetConstraintHasHealth.CreateInstance<TargetConstraintHasHealth>(),
+                    };
+                    data.countsAsHit = true;
+                })
+                );
+
+            // Warren Soultrader: Add Treasure equal to Health of ally behind
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add Gain Treasure Equal To Own Health To Ally Behind")
+                .WithText($"Add <card={wtg.GUID}.treasure> to your hand equal to its <keyword=health>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectApplyXInstant>("Instant Add Treasure To Hand Equal To Own Health");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                    data.doPing = false;
+                    data.eventPriority = 99999;
+                })
+                );
+
+            // Warren Soultrader: Instant add Treasure equal to own health
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Add Treasure To Hand Equal To Own Health")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    ScriptableCurrentHealth scriptAmount = ScriptableCurrentHealth.CreateInstance<ScriptableCurrentHealth>();
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.applyEqualAmount = true;
+                    data.scriptableAmount = scriptAmount;
+                    data.doPing = false;
+                    data.eventPriority = 99999;
+                })
+                );
+
+            // Laboratory Maniac: Gain +2/+2 when discard shuffled
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDiscardShuffled>("On Discard Shuffled Gain Attack Health")
+                .WithText($"Gain <+{{a}}><keyword=attack> and <+{{a}}><keyword=health> when the <keyword={wtg.GUID}.discardpocket> is shuffled")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDiscardShuffled>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Increase Attack & Health");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            // Springheart Nantuko: On card played summon ally behind with destroy self
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Summon Ally Behind With Destroy Self")
+                .WithText("Summon a copy of ally behind with \"Destroy self\"")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Copy With Destroy Self");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                })
+                );
+
+            // Death's Shadow: increase attack equal to missing health on leader
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>("While Active Gain Attack Equal To Damage On Leader")
+                .WithText("While active, increase own <keyword=attack> equal to the missing <keyword=health> on your leader")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Active"),
+                    };
+                    data.eventPriority = 10;
+                    data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    ScriptableDamageLeaderHasTaken scriptAmount = ScriptableDamageLeaderHasTaken.CreateInstance<ScriptableDamageLeaderHasTaken>();
+                    data.scriptableAmount = scriptAmount;
+                })
+                );
+
+            // UNUSED: health equal to damage on leader. It functions, but the display doesn't show it as temporary which is not fun :(
+            /*
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>("While Active Gain Health Equal To Damage On Leader")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Active"),
+                    };
+                    data.eventPriority = 10;
+                    data.effectToApply = TryGet<StatusEffectOngoingMaxHealth>("Ongoing Increase Maximum Health");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    ScriptableDamageLeaderHasTaken scriptAmount = ScriptableDamageLeaderHasTaken.CreateInstance<ScriptableDamageLeaderHasTaken>();
+                    data.scriptableAmount = scriptAmount;
+                })
+                );
+
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectOngoingMaxHealth>("Ongoing Increase Maximum Health")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                );
+            //*/
+
+            // Test: Trample
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectTrample>("Trample")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .WithIsStatus(true)
+                .WithVisible(true)
+                );
+
+            // Test: Temporary Trample
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSafeTemporaryTrait>("Temporary Trample")
+                .WithIsKeyword(true)
+                .WithOffensive(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSafeTemporaryTrait>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("Trample");
+                })
+                );
+
             Debug.Log("[WTG] Effects loaded!");
         }
     }

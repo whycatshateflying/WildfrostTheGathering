@@ -2,6 +2,7 @@
 using Deadpan.Enums.Engine.Components.Modding;
 using HarmonyLib;
 using Rewired;
+using Steamworks.ServerList;
 using System;
 using System.CodeDom;
 using System.Collections;
@@ -10,7 +11,10 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Localization;
+using static StatusEffectData;
+using static UnityEngine.Rendering.DebugUI.Table;
 
 namespace WildfrostTheGathering
 {
@@ -890,6 +894,123 @@ namespace WildfrostTheGathering
             }
         }
 
+        // Status effect apply x when something is shuffled
+        public class StatusEffectApplyXWhenDiscardShuffled : StatusEffectApplyX
+        {
+            public override void Init()
+            {
+                OnShuffle += ApplyXShuffle;
+            }
+            public void OnDestroy()
+            {
+                Debug.Log("[WTG] ondestroy called!");
+                OnShuffle -= ApplyXShuffle;
+            }
+
+            public void ApplyXShuffle()
+            {
+                Debug.Log("[WTG] applyXshuffle called!");
+                if (Battle.IsOnBoard(target))
+                {
+                    foreach (Entity entity in GetTargets().Distinct())
+                    {
+                        Debug.Log("[WTG] " + target.name + " is stacking " + effectToApply.name + " to " + entity.name);
+                        ActionQueue.Stack(new ActionApplyStatus(entity, target, effectToApply, GetAmount()));
+                    }
+                }
+            }
+            
+        }
+
+        public class StatusEffectTrample : StatusEffectData
+        {
+            public List<Entity> targetsBehind = [];
+
+            public override void Init()
+            {
+                base.PostHit += PiercingDamage;
+            }
+            public override bool RunHitEvent(Hit hit)
+            {
+                List<CardContainer> targetsRow = hit.target.actualContainers;
+                foreach (CardContainer container in targetsRow)
+                {
+                    CardContainer group = container.Group;
+                    foreach (Entity entity in group)
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] In the target's row there is: " + entity.name + " at index " + group.IndexOf(entity));
+                    }
+
+                    int index = group.IndexOf(hit.target);
+                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Target found in the row! " + index);
+                    Entity potentialTarget = group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1);
+                    if (index <= group.max && index != -1 && potentialTarget != null)
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Trying to trigger against target behind! " + potentialTarget?.name);
+                        if (!potentialTarget.isActiveAndEnabled)
+                        {
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " wasn't active and enabled!");
+                            continue;
+                        }
+                        if (!potentialTarget.alive)
+                        {
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " wasn't alive!");
+                            continue;
+                        }
+                        if (targetsBehind.IndexOf(potentialTarget) != -1)
+                        {
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " was already in the queue!");
+                            continue;
+                        }
+                        targetsBehind.AddIfNotNull(potentialTarget);
+                    }
+                    else
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Nope! it's at the end of the line! The index was " + index + ". The thing at index " + (index + 1) + " was " + group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1));
+                    }
+                }
+
+                return false;
+            }
+            private IEnumerator PiercingDamage(Hit hit)
+            {
+                Debug.Log("[WTG] Target is " + hit.target.name + " and I am " + target.name);
+                if (hit.attacker != target || hit.target == target)
+                {
+                    Debug.Log("[WTG] [" + target.name + "] Abort! Not my hit, not my biz (" + hit.attacker.name + ")");
+                    yield break;
+                }
+
+                if (hit.target.hp.current >= 0)
+                {
+                    Debug.Log("[WTG] No excess damage (" + hit.damageDealt + " is less than or equal to " + hit.target.hp.current + ")");
+                    yield break;
+                }
+                int excessDamage = 0 - hit.target.hp.current;
+                Debug.Log("[WTG] Excess damage done is " + excessDamage);
+
+                while (targetsBehind.Count > 0)
+                {
+                    Entity targetBehind = targetsBehind[0];
+                    targetsBehind.RemoveAt(0);
+                    if (!targetBehind.isActiveAndEnabled)
+                    {
+                        Debug.Log("[WTG] " + targetBehind.name + " wasn't active and enabled!");
+                        continue;
+                    }
+                    if (!targetBehind.alive)
+                    {
+                        Debug.Log("[WTG] " + targetBehind.name + " wasn't alive!");
+                        continue;
+                    }
+                    Debug.Log("[WTG] Creating Hit " + target.name + ", " + targetBehind + ", " + excessDamage);
+                    Hit trampleHit = new Hit(target, targetBehind, excessDamage);
+                    trampleHit.AddAttackerStatuses();
+                    yield return trampleHit.Process();
+                }
+            }
+        }
+        
         // Thank you again Abigail for the very yoinkable code! :3 And thank you semmie+Abigail for debugging said code when it broke on its own!
         public class ScriptableTargetsOnBoard : ScriptableAmount
         {
@@ -957,6 +1078,47 @@ namespace WildfrostTheGathering
                 }
                 return entity.counter.current;
             }
+        }
+
+        // For Death's shadow
+        public class ScriptableDamageLeaderHasTaken : ScriptableAmount
+        {
+            public override int Get(Entity entity)
+            {
+                int sum = 0;
+                List<Entity> allies = entity.GetAllAllies();
+                Debug.Log("[WTG] ScriptableDamageLeaderHasTaken Get() called on " + entity.name + "!");
+                foreach (Entity ally in allies)
+                {
+                    if (ally.data.cardType.name != "Leader")
+                    {
+                        continue;
+                    }
+                    Debug.Log("[WTG] " + ally.name + " is a leader!. ally.hp.max - ally.hp.current = " + (ally.hp.max - ally.hp.current));
+                    sum += (ally.hp.max - ally.hp.current);
+                }
+                return sum;
+            }
+        }
+
+        // Updates when leader display updates and the health has changed. Thank you semmie for helping debug!
+        public class StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage : StatusEffectWhileActiveX
+        {
+            public override void Init()
+            {
+                Events.OnEntityDisplayUpdated += UpdateEffectWhenLeaderDisplayUpdates;
+                base.Init();
+            }
+
+            private void UpdateEffectWhenLeaderDisplayUpdates (Entity entity)
+            {
+                Debug.Log("[WTG] " + GetAmount(target) + "  " + currentAmount);
+                if (entity.data.cardType.name == "Leader" && currentAmount != GetAmount(target))
+                {
+                    ActionQueue.Add(new ActionRefreshWhileActiveEffect(this));
+                }
+            }
+
         }
 
         // For when you need to count the number of targets with a trait or type in hand
@@ -1255,7 +1417,6 @@ namespace WildfrostTheGathering
             public bool includeCrowned = false;
             public CardData.StatusEffectStacks effectToApply;
 
-
             public override IEnumerator Process()
             {
                 if (inDeck)
@@ -1405,7 +1566,7 @@ namespace WildfrostTheGathering
                         }
                     }
 
-                    if (!foundCard)  // If that didn't work, shuffle the discard to try and get the top card again
+                    if (!foundCard)  // If that didn't work, cry about it cause shuffling only works on an empty pile also that'd be weird
                     {
                         Events.InvokeCardDrawEnd();
                         Debug.Log("[WTG] No tutor targets :(");
@@ -1730,7 +1891,7 @@ namespace WildfrostTheGathering
             }
         }
 
-        // If the target has less than a certain amount of health
+        // If the target has less than a certain amount of health (shut UP I know I can not a health more than ;-;)
         public class TargetConstraintHealthLessThan : TargetConstraint
         {
             public int value;
@@ -1822,7 +1983,33 @@ namespace WildfrostTheGathering
             }
         }
 
-        // TODO: Balance manaform hellkite
+        // Laboratory maniac adding an event to OnShuffle
+        public static event UnityAction OnShuffle;
+        public static void InvokeOnShuffle()
+        {
+            Debug.Log("[WTG] On shuffle Invoked!");
+            OnShuffle?.Invoke();
+        }
+
+        [HarmonyPatch(typeof(Sequences), nameof(Sequences.ShuffleTo))]
+        class PatchOnShuffle
+        {
+            static bool Prefix(CardContainer fromContainer, CardContainer toContainer, float delayBetween)
+            {
+                if (!toContainer || !toContainer.Empty || !fromContainer || fromContainer.Empty)
+                {
+                    return true;
+                }
+                if (fromContainer.Equals(References.Player.discardContainer) && toContainer.Equals(References.Player.drawContainer))
+                {
+                    InvokeOnShuffle();
+                }
+                return true;
+            }
+        }
+        
+        // TODO: Trample ignores clunkers (test more prob) (then add a check for clunkers)
+        // TODO: Balance Manaform Hellkite
         // TODO: Manaform hellkite when in hand
         // TODO: Make Delayed Blast Fireball not clear all spice after played
         // TODO: Make beatable ascendeds
@@ -1831,9 +2018,10 @@ namespace WildfrostTheGathering
         // TODO: Make charms that care about target mode recognize the custom ones (gnome, pom so far)
         // TODO: make zoomlin sound not play twice for treasures added to hand (if possible)
         // TODO: Make Eyedata for the ascendeds
-        // TODO: Make Manaform Hellkite+Guttersnipe not trigger on each hit of frenzy
+        // TODO: Make Manaform Hellkite + Guttersnipe not trigger on each hit of frenzy
         // TODO: Make Manaform Hellkite count current attack
         // TODO: Make the enabled exist better for apply to all deck (If possible. Double check with miya to see how)
+        // TODO: eq dragon counter flickers when flying allies in hand are discarded
 
         private void CreateModAssets()
         {
@@ -1867,7 +2055,9 @@ namespace WildfrostTheGathering
                                                         "powerPlay", "damnablePact", "assassinate", "advantageousProclamation",
                                                         "doomsday", "throesOfChaos"};
 
-                string[] genericCompanions = new string[] { "fearOfSleepParalysis" };
+                string[] genericCompanions = new string[] { "fearOfSleepParalysis", "mulldrifter", "nulldrifter", "deadeyeNavigator",
+                                                            "beastWhisperer", "warrenSoultrader", "laboratoryManiac", "springheartNantuko",
+                                                            "deathsShadow", "hydraOmnivore" };
 
                 string[] genericCharms = new string[] { };
 
@@ -2188,6 +2378,7 @@ namespace WildfrostTheGathering
 
         public CardData.StatusEffectStacks SStack(string name, int amount) => new CardData.StatusEffectStacks(TryGet<StatusEffectData>(name), amount);
         public CardData.TraitStacks TStack(string name, int amount) => new CardData.TraitStacks(TryGet<TraitData>(name), amount);
+        public CardData.TraitStacks TStack(string name) => new CardData.TraitStacks(TryGet<TraitData>(name), 1);
 
         public StatusEffectDataBuilder StatusCopy(string oldName, string newName)
         {
