@@ -14,6 +14,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Localization;
 using static StatusEffectData;
+using static Targets;
 using static UnityEngine.Rendering.DebugUI.Table;
 
 namespace WildfrostTheGathering
@@ -932,66 +933,188 @@ namespace WildfrostTheGathering
             }
             public override bool RunHitEvent(Hit hit)
             {
+                if (hit == null)
+                {
+                    Debug.Log("[WTG] Null hit passed to me. Ignoring...");
+                    return false;
+                }
+                if (hit.attacker == null || hit.target == null)
+                {
+                    Debug.Log("[WTG] Null targets for attack, nothing to see here... " + hit.attacker?.name + " " + hit.target?.name);
+                    return false;
+                }
                 List<CardContainer> targetsRow = hit.target.actualContainers;
                 foreach (CardContainer container in targetsRow)
                 {
-                    CardContainer group = container.Group;
-                    foreach (Entity entity in group)
+                    Debug.Log("[WTG] ~~ Pre Hit Against " + hit.target.name + " ~~");
+                    if (hit.attacker != target)
                     {
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] In the target's row there is: " + entity.name + " at index " + group.IndexOf(entity));
+                        Debug.Log("[WTG] [" + target.name + "] Abort! Not my hit, not my biz (" + hit.attacker.name + ")");
+                        return false;
+                    }
+                    if (hit.target == target)
+                    {
+                        Debug.Log("[WTG] I think I'm hitting myself...");
                     }
 
+                    CardContainer group = container.Group;
+
                     int index = group.IndexOf(hit.target);
-                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Target found in the row! " + index);
-                    Entity potentialTarget = group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1);
+
+                    Entity potentialTarget = group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1);  // Access group[index + 1] cause it doesn't function correctly
+
+                    // Logic for adding targets. Alive, a + e, and isn't a duplicate
                     if (index <= group.max && index != -1 && potentialTarget != null)
                     {
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Trying to trigger against target behind! " + potentialTarget?.name);
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Checking eligibility for hit against " + potentialTarget.name);
                         if (!potentialTarget.isActiveAndEnabled)
                         {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " wasn't active and enabled!");
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't active and enabled!");
                             continue;
                         }
                         if (!potentialTarget.alive)
                         {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " wasn't alive!");
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't alive!");
                             continue;
                         }
                         if (targetsBehind.IndexOf(potentialTarget) != -1)
                         {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " was already in the queue!");
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " is already in the queue!");
                             continue;
                         }
+
+                        if (hit.target.data.IsClunker)
+                        {
+                            bool flag = false;
+                            foreach (StatusEffectData statusEffect in hit.target.statusEffects)
+                            {
+                                if (statusEffect == null || statusEffect.name != "Scrap")
+                                {
+                                    continue;
+                                }
+                                Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Aha! " + hit.target.name + " is a clunker!");
+                                if (statusEffect.count <= 1)
+                                {
+                                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " is gonna die, let the trample damage through");
+                                    continue;
+                                }
+                                else
+                                {
+                                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " isn't gonna die, so there's no more trampling!");
+                                    flag = true;
+                                    break;
+                                }
+                            }
+                            if (flag)
+                            {
+                                continue;
+                            }
+                        }
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Adding " + potentialTarget.name);
                         targetsBehind.AddIfNotNull(potentialTarget);
                     }
                     else
                     {
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Nope! it's at the end of the line! The index was " + index + ". The thing at index " + (index + 1) + " was " + group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1));
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Nope! it's at the end of the line! The index was " + index + ". The thing at index " + (index + 1) + " was " + potentialTarget?.name);
                     }
                 }
+                Debug.Log("[WTG] ~~ End ~~");
 
                 return false;
             }
+            public override bool RunPostHitEvent(Hit hit)
+            {
+                if (targetsBehind.Count == 0)
+                {
+                    return false;
+                }
+                return true;
+            }
             private IEnumerator PiercingDamage(Hit hit)
             {
-                Debug.Log("[WTG] Target is " + hit.target.name + " and I am " + target.name);
-                if (hit.attacker != target || hit.target == target)
+                if (hit == null)
+                {
+                    Debug.Log("[WTG] Null hit passed to me. Ignoring...");
+                    yield break;
+                }
+                if (hit.attacker == null || hit.target == null)
+                {
+                    Debug.Log("[WTG] Null targets for attack, nothing to see here... " + hit.attacker?.name + " " + hit.target?.name);
+                    yield break;
+                }
+
+                Debug.Log("[WTG] ~~ Post Hit Against " + hit.target.name + " ~~");
+
+                Debug.Log("[WTG] ~~ Pre Hit Against " + hit.target.name + " ~~");
+                if (hit.attacker != target)
                 {
                     Debug.Log("[WTG] [" + target.name + "] Abort! Not my hit, not my biz (" + hit.attacker.name + ")");
                     yield break;
                 }
-
-                if (hit.target.hp.current >= 0)
+                if (hit.target == target)
                 {
-                    Debug.Log("[WTG] No excess damage (" + hit.damageDealt + " is less than or equal to " + hit.target.hp.current + ")");
+                    Debug.Log("[WTG] I think I'm hitting myself...");
+                }
+
+                Debug.Log("[WTG] Target was " + hit.target.name);
+
+                int excessDamage = 0;
+                if (hit.target.data.IsClunker)
+                {
+                    Debug.Log("[WTG] ~~ Clunker Code Starting ~~");
+                    bool hasScrapStill = false;
+                    foreach (StatusEffectData statusEffect in hit.target.statusEffects)
+                    {
+                        Debug.Log("[WTG] " + statusEffect.name + " has a stack of " + statusEffect.count);
+                        if (statusEffect.name == "Scrap")
+                        {
+                            hasScrapStill = true;
+                        }
+                    }
+                    if (!hasScrapStill)
+                    {
+                        Debug.Log("[WTG] " + hit.target.name + " doesn't have scrap so it's died. Reducing the damage by 1");
+                        excessDamage--;
+                    }
+                    else
+                    {
+                        Debug.Log("[WTG] " + hit.target.name + " Still has scrap. Abort!");
+                        Debug.Log("[WTG] ~~ Clunker Code Ending ~~");
+                        Debug.Log("[WTG] ~~ End ~~");
+                        yield break;
+                    }
+                    Debug.Log("[WTG] ~~ Clunker Code Ending ~~");
+                }
+                if (hit.target.hp.current >= 0 && !hit.target.data.IsClunker)
+                {
+                    Debug.Log("[WTG] No excess damage (" + hit.target.name + " has 0 health)");
+                    Debug.Log("[WTG] ~~ End ~~");
+                    if (targetsBehind.Count > 0)
+                    {
+                        targetsBehind.RemoveAt(0);
+                    }
                     yield break;
                 }
-                int excessDamage = 0 - hit.target.hp.current;
-                Debug.Log("[WTG] Excess damage done is " + excessDamage);
+
+                if (hit.target.data.IsClunker)
+                {
+                    excessDamage = hit.damageBlocked - 1;
+                }
+                else
+                {
+                    excessDamage -= hit.target.hp.current;
+                }
+
+                Debug.Log("[WTG] Excess damage done was " + excessDamage);
+                foreach (Entity entity in targetsBehind)
+                {
+                    Debug.Log("[Tutorial] There's " +  entity.name + " in the hit queue!");
+                }
 
                 while (targetsBehind.Count > 0)
                 {
                     Entity targetBehind = targetsBehind[0];
+                    Debug.Log("[WTG] Checking " + targetBehind.name);
                     targetsBehind.RemoveAt(0);
                     if (!targetBehind.isActiveAndEnabled)
                     {
@@ -1003,11 +1126,13 @@ namespace WildfrostTheGathering
                         Debug.Log("[WTG] " + targetBehind.name + " wasn't alive!");
                         continue;
                     }
-                    Debug.Log("[WTG] Creating Hit " + target.name + ", " + targetBehind + ", " + excessDamage);
+                    Debug.Log("[WTG] Creating Hit " + target.name + ", " + targetBehind.name + ", " + excessDamage);
+                    Debug.Log("[WTG] This is happening in the hit for " + hit.target.name + " btw");
                     Hit trampleHit = new Hit(target, targetBehind, excessDamage);
                     trampleHit.AddAttackerStatuses();
                     yield return trampleHit.Process();
                 }
+                Debug.Log("[WTG] ~~ End ~~");
             }
         }
         
@@ -2008,7 +2133,7 @@ namespace WildfrostTheGathering
             }
         }
         
-        // TODO: Trample ignores clunkers (test more prob) (then add a check for clunkers)
+        // TODO: Organize and comment Trample code (bleh)
         // TODO: Balance Manaform Hellkite
         // TODO: Manaform hellkite when in hand
         // TODO: Make Delayed Blast Fireball not clear all spice after played

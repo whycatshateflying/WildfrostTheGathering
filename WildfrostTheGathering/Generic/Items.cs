@@ -123,7 +123,7 @@ namespace WildfrostTheGathering.Generic
                 .SetDamage(0)
                 .WithPools("SnowItemPool")
                 .SetSprites("disdainful-stroke-svelinov.png", "item-bg.png")
-                .WithValue(10)
+                .WithValue(40)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -696,6 +696,7 @@ namespace WildfrostTheGathering.Generic
                 .SetDamage(null)
                 .WithPools("GeneralItemPool")
                 .SetSprites("throes-of-chaos-ikieryluk.png", "item-bg.png")
+                .WithValue(35)
                 .WithFlavour("When the world is consumed by chaos, the skilled and the foolish are on equal footing")
                 .SubscribeToAfterAllBuildEvent(data =>
                 {

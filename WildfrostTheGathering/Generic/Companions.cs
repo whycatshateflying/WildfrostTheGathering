@@ -130,7 +130,7 @@ namespace WildfrostTheGathering.Generic
                         wtg.SStack("On Card Played Sacrifice Ally Behind Needs Health", 1),
                         wtg.SStack("On Card Played Add Gain Treasure Equal To Own Health To Ally Behind", 1),
                     };
-                    data.greetMessages = new string[] { "The living take their souls for granted. The dead know what they’re worth" };
+                    data.greetMessages = new string[] { "The living take their souls for granted. The dead know what they\'re worth" };
                 })
                 );
 
