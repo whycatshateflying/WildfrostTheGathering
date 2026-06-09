@@ -14,6 +14,7 @@ namespace WildfrostTheGathering
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Traits loading!");
+
             // Flying
             assets.Add(
                 new TraitDataBuilder(wtg)
@@ -104,6 +105,17 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent((trait) =>
                 {
                     trait.keyword = TryGet<KeywordData>("conspiracy");
+                    trait.effects = new StatusEffectData[] { };
+                })
+                );
+
+            // Prey
+            assets.Add(
+                new TraitDataBuilder(wtg)
+                .Create("Prey")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = TryGet<KeywordData>("prey");
                     trait.effects = new StatusEffectData[] { };
                 })
                 );

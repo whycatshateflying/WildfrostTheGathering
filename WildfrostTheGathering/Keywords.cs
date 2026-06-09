@@ -101,7 +101,7 @@ namespace WildfrostTheGathering
                 .WithCanStack(false)
                 );
 
-            // Unplayable
+            // Trample
             assets.Add(
                 new KeywordDataBuilder(wtg)
                 .Create("trample")
@@ -109,6 +109,15 @@ namespace WildfrostTheGathering
                 .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
                 .WithDescription("Deal excess damage to target behind|Does not wrap lanes") //Format is body|note.
                 .WithCanStack(false)  // The keyword does not show its stack number.
+                );
+
+            // Prey
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("prey")
+                .WithTitle("Prey")
+                .WithShowName(true)
+                .WithDescription("Tetzimoc is watching...")
+                .WithCanStack(false)
                 );
 
             Debug.Log("[WTG] Keywords loaded!");

@@ -556,7 +556,7 @@ namespace WildfrostTheGathering.Generic
                     data.canPlayOnHand = true;
                     data.createScripts = new CardScript[]
                     {
-                            wtg.GiveUpgrade("CrownCursed"),
+                        GiveUpgrade("CrownCursed"),
                     };
                 })
                 );
@@ -585,7 +585,7 @@ namespace WildfrostTheGathering.Generic
                     data.needsTarget = false;
                     data.createScripts = new CardScript[]
                     {
-                        wtg.GiveUpgrade("CrownCursed"),
+                        GiveUpgrade("CrownCursed"),
                     };
                 })
                     );
@@ -661,7 +661,7 @@ namespace WildfrostTheGathering.Generic
                     data.needsTarget = false;
                     data.createScripts = new CardScript[]
                     {
-                        wtg.GiveUpgrade("CrownCursed"),
+                        GiveUpgrade("CrownCursed"),
                     };
                 })
                 );

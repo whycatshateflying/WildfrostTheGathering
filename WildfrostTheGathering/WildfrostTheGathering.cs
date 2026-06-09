@@ -13,9 +13,6 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Localization;
-using static StatusEffectData;
-using static Targets;
-using static UnityEngine.Rendering.DebugUI.Table;
 
 namespace WildfrostTheGathering
 {
@@ -336,29 +333,30 @@ namespace WildfrostTheGathering
 
         }
 
-        // Only apply the deployed effect if the deployed has a certain trait (Thank you ME for BEING AWESOME and DOING IT MYSELF)
-        public class StatusEffectApplyXWhenDeployedNoHandIfTrait : StatusEffectApplyXWhenDeployedNoHand
+        // Only apply the deployed effect if the deployed meets a predicate (Thank you ME for BEING AWESOME and DOING IT MYSELF)
+        public class StatusEffectApplyXWhenDeployedNoHandIfPredicate : StatusEffectApplyXWhenDeployedNoHand
         {
-            public TraitData wantedTrait;
+            public Predicate<Entity> pred;
             public List<CardData> excludedCards;
             public override bool RunCardMoveEvent(Entity entity)
             {
                 if (excludedCards.Count > 0 && excludedCards.Any(card => card.name.Equals(entity.name)))
                 {
-                    Debug.Log("[WTG] " + entity.name + " was in excluded cards");
+                    // Debug.Log("[WTG] " + entity.name + " was in excluded cards");
                     return false;
                 }
                 // Debug.Log("[WildfrostTheGathering] " + entity.name + " was added to play");
-                foreach (Entity.TraitStacks trait in entity.traits)
+
+                var predicate = TryGet<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(name).pred;
+
+                if (predicate is null)
+                    throw new ArgumentException("No predicate found");
+
+                if (predicate.Invoke(entity))
                 {
-                    // Debug.Log("[WildfrostTheGathering] " + entity.name + " has trait " + trait.data.name);
-                    if (trait.data.name.Equals(wantedTrait.name))
-                    {
-                        // Debug.Log("[WildfrostTheGathering] returning base.RunCardMoveEvent");
-                        return base.RunCardMoveEvent(entity);
-                    }
+                    // Debug.Log("[WTG] Running base checks! Maybe run event!");
+                    return base.RunCardMoveEvent(entity);
                 }
-                // Debug.Log("[WildfrostTheGathering] returning false");
                 return false;
             }
 
@@ -662,20 +660,15 @@ namespace WildfrostTheGathering
         public class StatusEffectApplyXOnCertainCardPlayed : StatusEffectApplyXOnCardPlayed
         {
             public bool summonQueue = false;
-            public bool whileActive = false;
-            public int allowedTimes = 0;
+            public int[] onNthTimePlayedPerTurn = [];  // If empty, ignore the check
             public int numTimesPlayed = 0;
-            public int attackGreaterThan = -100;  // -100 is "don't check". If I make it nullable, it's always null :/
-            public CardType allowedCardType;
-            public bool countsSelf = false;
-            public CardData[] allowedCards = [];
-            public TraitData[] allowedTraits = [];
+            public Predicate<Entity> pred;
             public Hit _hackyHit;
 
             public override void Init()
             {
                 base.OnCardPlayed += Check;
-                if (allowedTimes > 0)
+                if (onNthTimePlayedPerTurn.Length > 0)
                 {
                     base.OnTurnEnd += ResetTimes;
                 }
@@ -683,14 +676,13 @@ namespace WildfrostTheGathering
 
             public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
             {
-                // Debug.Log("[WTG] " + attackGreaterThan + " " + (attackGreaterThan != -100).ToString());
                 Debug.Log("[WildfrostTheGathering] (" + target.name + ") " + entity.name + " detected. " + numTimesPlayed + " Have been played this turn and I've been updated");
-                if (whileActive && !Battle.IsOnBoard(target))
+                if (!Battle.IsOnBoard(target))
                 {
                     Debug.Log("[WildfrostTheGathering] ...but I'm not active yet");
                     return false;
                 }
-                if (allowedTimes > 0 && numTimesPlayed + 1> allowedTimes)
+                if (onNthTimePlayedPerTurn.Length > 0 && !onNthTimePlayedPerTurn.Contains(numTimesPlayed + 1))
                 {
                     Debug.Log("[WildfrostTheGathering] ...and that's too many times for me");
                     return false;
@@ -700,40 +692,21 @@ namespace WildfrostTheGathering
                     Debug.Log("[WildfrostTheGathering] ...but I was not enabled");
                     return false;
                 }
-                if (!countsSelf && target == entity)
-                {
-                    Debug.Log("[WildfrostTheGathering] ...but was myself (" + target.name + ")");
-                    return false;
-                }
-                if (allowedCardType != null && allowedCardType.name != entity.data.cardType.name)
-                {
-                    Debug.Log("[WildfrostTheGathering] ...but was the wrong card type (" + allowedCardType.name + ") and (" + entity.data.cardType.name + ")");
-                    return false;
-                }
-                if (attackGreaterThan != -100 && (entity.data.damage <= attackGreaterThan || !entity.data.hasAttack))
-                {
-                    Debug.Log("[WildfrostTheGathering] ... but had no attack (" + entity.data.hasAttack + "), (" + entity.data.damage + ")");
-                    return false;
-                }
 
-                IEnumerable<TraitData> source = entity.traits.Select((Entity.TraitStacks t) => t.data);
-                List<TraitData> source2 = source.ToList();
-                TraitData[] array = allowedTraits;
-                if (array != null && array.Length > 0 && !source2.ToList().ContainsAny(allowedTraits))
+                var predicate = TryGet<StatusEffectApplyXOnCertainCardPlayed>(name).pred;
+
+                if (predicate is null)
+                    throw new ArgumentException("No predicate found");
+                
+                if (!predicate.Invoke(entity))
                 {
-                    Debug.Log("[WildfrostTheGathering] ...but didn't have the trait");
+                    Debug.Log("[WildfrostTheGathering] ...but failed the predicate check " + entity.data.name);
                     return false;
                 }
 
                 _hackyHit = new Hit(entity, null);
-                CardData[] array2 = allowedCards;
-                Debug.Log("[WildfrostTheGathering] " + array2 + " || " + array2.Length + " || " + allowedCards.ToList().Any((CardData c) => c.name == entity.data.name));
-                if (array2 == null || array2.Length <= 0 || allowedCards.ToList().Any((CardData c) => c.name == entity.data.name))
-                {
-                    numTimesPlayed++;
-                    return true;
-                }
-                return false;
+                numTimesPlayed++;
+                return true;
             }
 
             public new IEnumerator Check(Entity entity, Entity[] targets)
@@ -759,7 +732,7 @@ namespace WildfrostTheGathering
             public override void Init()
             {
                 base.OnCardPlayed += Check;
-                if (allowedTimes > 0)
+                if (onNthTimePlayedPerTurn.Length > 0)
                 {
                     base.OnTurnEnd += ResetTimes;
                 }
@@ -774,37 +747,6 @@ namespace WildfrostTheGathering
                 }
                 else
                     return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), entity.damage.current);
-            }
-        }
-
-        // For use with applyEqualAmount but when I need an "equal to counter"
-        public class StatusEffectApplyXEqualToCounterOnCertainCardPlayed : StatusEffectApplyXOnCertainCardPlayed
-        {
-            public bool ofTarget;
-            public override void Init()
-            {
-                base.OnCardPlayed += Check;
-                if (allowedTimes > 0)
-                {
-                    base.OnTurnEnd += ResetTimes;
-                }
-            }
-            public new IEnumerator Check(Entity entity, Entity[] targets)
-            {
-                int sumOfCounters = 0;
-                if (ofTarget)
-                {
-                    foreach (Entity target in targets)
-                    {
-                        Debug.Log("[WildfrostTheGathering] Entity is " + entity.name + " and the counter of a target is " + target.counter.current);
-                        sumOfCounters += target.counter.current;
-                    }
-                }
-                else
-                {
-                    sumOfCounters = entity.counter.current;
-                }
-                return Run(GetTargets(_hackyHit, StatusEffectApplyXOnCardPlayed.GetWasInRows(entity, targets), null, targets), sumOfCounters);
             }
         }
 
@@ -923,6 +865,7 @@ namespace WildfrostTheGathering
             
         }
 
+        // It's trample
         public class StatusEffectTrample : StatusEffectData
         {
             public List<Entity> targetsBehind = [];
@@ -1135,12 +1078,78 @@ namespace WildfrostTheGathering
                 Debug.Log("[WTG] ~~ End ~~");
             }
         }
+
+        // Ongoing - Trample
+        public class StatusEffectTrampleOnce : StatusEffectTrample
+        {
+            public bool cardPlayed;
+            public override void Init()
+            {
+                base.OnActionPerformed += ClearAfterAttacking;
+                base.Init();
+            }
+            public override bool RunCardPlayedEvent(Entity entity, Entity[] targets)
+            {
+                if (!cardPlayed && entity == target && count > 0)
+                {
+                    cardPlayed = true;
+                }
+                return false;
+            }
+
+            private IEnumerator ClearAfterAttacking(PlayAction action)
+            {
+                if (cardPlayed && target.enabled && !target.silenced && action is ActionProcessTrigger)
+                {
+                    Debug.Log("[WTG] ACTUALLY BEGONE CREATURE!");
+                    yield return Remove();
+                }
+            }
+            public override bool RunStackEvent(int stacks)
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return false;
+            }
+            public override bool RunEndEvent()
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return false;
+            }
+        }
+
+        // Apply the thing every time you end a turn with it in hand
+        public class StatusEffectApplyXOnTurnEndWhileInHand : StatusEffectApplyX
+        {
+            public override void Init()
+            {
+                base.OnTurnEnd += ApplyXWhileInHand;
+            }
+
+            private IEnumerator ApplyXWhileInHand(Entity entity)
+            {
+                if (entity != target)
+                {
+                    Debug.Log("[WTG] Not for me");
+                    yield break;
+                }
+                if (!target.isActiveAndEnabled || !target.InHand())
+                {
+                    Debug.Log("[WTG] Not in hand and a + e");
+                    yield break;
+                }
+                Debug.Log("[WTG] Applying " + effectToApply.name);
+                yield return Run(GetTargets(), GetAmount());
+            }
+        }
         
         // Thank you again Abigail for the very yoinkable code! :3 And thank you semmie+Abigail for debugging said code when it broke on its own!
         public class ScriptableTargetsOnBoard : ScriptableAmount
         {
             public bool allies;
             public bool enemies;
+            public bool self;
             public bool inRow = false;
             public int mult = 1;
             public CardType cardType;
@@ -1167,6 +1176,12 @@ namespace WildfrostTheGathering
                     List<Entity> enemies = entity.GetAllEnemies();
                     num += enemies.Count((Entity e) => (cardType is null || e.data.cardType == cardType) && (hasTrait is null || e.traits.Any(t => t.data.name.Equals(hasTrait.name))));
                 }
+
+                if (entity.inPlay)
+                {
+                    num++;
+                }
+
                 return num * mult;
             }
 
@@ -1244,6 +1259,36 @@ namespace WildfrostTheGathering
                 }
             }
 
+        }
+
+        // Status effect don't count down
+        public class StatusEffectOnlyCountDownWhenPredicate : StatusEffectData
+        {
+            public Predicate<Entity> pred;
+            public override void Init()
+            {
+                Events.OnEntityCountDown += DontCountDown;
+            }
+
+            private void DontCountDown(Entity entity, ref int amount)
+            {
+                // Debug.Log("[WTG] Someone counted down! " + entity.name);
+                if (entity == target)
+                {
+                    Debug.Log("[WTG] I (" + target.name + ") counted down! Checking the predicate");
+
+                    var predicate = TryGet<StatusEffectOnlyCountDownWhenPredicate>(name).pred;
+
+                    if (predicate is null)
+                        throw new ArgumentException("No predicate found");
+
+                    if (!predicate.Invoke(target))
+                    {
+                        Debug.Log("[WTG] Predicate did not pass :( Setting amount to 0");
+                        amount = 0;
+                    }
+                }
+            }
         }
 
         // For when you need to count the number of targets with a trait or type in hand
@@ -2133,6 +2178,7 @@ namespace WildfrostTheGathering
             }
         }
         
+        // TODO: Maddening Cacophony resets when exit and return
         // TODO: Organize and comment Trample code (bleh)
         // TODO: Balance Manaform Hellkite
         // TODO: Manaform hellkite when in hand
@@ -2147,6 +2193,7 @@ namespace WildfrostTheGathering
         // TODO: Make Manaform Hellkite count current attack
         // TODO: Make the enabled exist better for apply to all deck (If possible. Double check with miya to see how)
         // TODO: eq dragon counter flickers when flying allies in hand are discarded
+        // TODO: Fix mtg card back
 
         private void CreateModAssets()
         {
@@ -2154,7 +2201,7 @@ namespace WildfrostTheGathering
             {  // Decks
 
                 string[] dragonDeckLeaders = new string[] { "miirymSentinelWyrmLeader", "theUrDragonLeader", "lathlissDragonQueenLeader",
-                                                            "oldGnawboneLeader", "ganaxAstralHunterLeader", "drakusethMawOfFlamesLeader" };
+                                                            "oldGnawboneLeader", "ganaxAstralHunterLeader", "drakusethMawOfFlamesLeader", };
 
                 string[] dragonDeckItems = new string[] {   "treasure", "dragonsFire", "delayedBlastFireball", "spitFlame", "draconicLore",
                                                             "loftyDenial", "spellSwindle", "fireball", "sharedAnimosity", "bottleCapBlast",
@@ -2221,188 +2268,6 @@ namespace WildfrostTheGathering
                     })
                     );
 
-                {  // Leaders
-
-                    // The Ur-Dragon
-                    assets.Add(
-                    new CardDataBuilder(this)
-                    .CreateUnit("theUrDragonLeader", "The Ur-Dragon", idleAnim: "GiantAnimationProfile")
-                    .WithCardType("Leader")
-                    .SetSprites("the-ur-dragon-jjones.png", "companion-bg.png")
-                    .SetStats(9, 5, 6)  // 8-10, 5-6, 6
-                    .WithFlavour("<i><b>*A dark shadow covers the area*</b></i>")
-                    .WithValue(25)
-                    .SubscribeToAfterAllBuildEvent(data =>
-                    {
-                        data.traits = new List<CardData.TraitStacks>()
-                        {
-                            new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            new CardData.TraitStacks(Get<TraitData>("Draw"), 2),  // 2
-                        };
-                        data.startWithEffects = new CardData.StatusEffectStacks[]
-                        {
-                            SStack("While Active Zoomlin When Drawn To Flying Allies In Hand", 1)
-                        };
-                        data.greetMessages = new string[2] { "<i>Source of all dragons across the multiverse, <b>The Ur-Dragon, Progenitor of Fire</b>, tears holes in the aether to travel</i>",
-                                                            "<i><b>*A dark shadow covers the area*</b></i>"};
-                        data.createScripts = new CardScript[]
-                        {
-                            GiveUpgrade(),
-                            AddRandomHealth(-1,1),
-                            AddRandomDamage(0,1),
-                        };
-                    })
-                    );
-
-                    // Miirym, Sentinel Wyrm
-                    assets.Add(
-                        new CardDataBuilder(this)
-                        .CreateUnit("miirymSentinelWyrmLeader", "Miirym, Sentinel Wyrm", idleAnim: "FloatAnimationProfile")
-                        .WithCardType("Leader")
-                        .SetSprites("miirym-sentinel-wyrm-kkotaki.png", "companion-bg.png")
-                        .SetStats(8, 3, 5)  // 8-9, 3-4, 5
-                        .WithFlavour("\"Do you have tales of the world outside? It\'s been so long since I've left <b>Candlekeep</b>\"")
-                        .WithValue(25)
-                        .SubscribeToAfterAllBuildEvent(data =>
-                        {
-                            data.traits = new List<CardData.TraitStacks>()
-                            {
-                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            };
-                            data.startWithEffects = new CardData.StatusEffectStacks[]
-                            {
-                                SStack("On Card Played Summon Copy Of Ally Ahead With X Health And Fragile", 1)
-                            };
-                            data.greetMessages = new string[1] { "\"Do you have tales of the world outside? It's been so long since I've left <b>Candlekeep</b>\"" };
-                            data.createScripts = new CardScript[]
-                            {
-                                GiveUpgrade(),
-                                AddRandomHealth(0,1),
-                                AddRandomDamage(0,1),
-                            };
-                        })
-                        );
-
-                    // Lathliss, Dragon Queen
-                    assets.Add(
-                        new CardDataBuilder(this)
-                        .CreateUnit("lathlissDragonQueenLeader", "Lathliss, Dragon Queen", idleAnim: "ShakeAnimationProfile")
-                        .WithCardType("Leader")
-                        .SetSprites("lathliss-dragon-queen-akonstad.png", "companion-bg.png")
-                        .SetStats(7, 3, 4)  // 7-8, 3-4, 3-5
-                        .WithFlavour("<i>Sages whisper that <b>Lathliss</b> still keeps the heart of the old dragon queen sealed within a jewel, its smoldering warmth an eternal reminder that no monarch is untouchable</i>")
-                        .WithValue(25)
-                        .SubscribeToAfterAllBuildEvent(data =>
-                        {
-                            data.traits = new List<CardData.TraitStacks>()
-                            {
-                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            };
-                            data.startWithEffects = new CardData.StatusEffectStacks[]
-                            {
-                                SStack("When Flying Ally Deployed Summon Big Dragon Token With X Health", 4)
-                            };
-                            data.greetMessages = new string[1] { "<i>Sages whisper that <b>Lathliss</b> still keeps the heart of the old dragon queen sealed within a jewel, its smoldering warmth an eternal reminder that no monarch is untouchable</i>" };
-                            data.createScripts = new CardScript[]
-                            {
-                                GiveUpgrade(),
-                                AddRandomHealth(0,1),
-                                AddRandomDamage(0,1),
-                                AddRandomCounter(-1,1)
-                            };
-                        })
-                        );
-
-                    // Old Gnawbone
-                    assets.Add(
-                        new CardDataBuilder(this)
-                        .CreateUnit("oldGnawboneLeader", "Old Gnawbone", idleAnim: "FloatSquishAnimationProfile")
-                        .WithCardType("Leader")
-                        .SetSprites("old-gnawbone-fburburan.png", "companion-bg.png")
-                        .SetStats(7, 6, 5)  // 7-8, 5-7, 5-6
-                        .WithFlavour("The ancient green dragon <b>Claugiyliamatar</b> is often seen with a mangled corpse dangling from her mouth.")
-                        .WithValue(25)
-                        .SubscribeToAfterAllBuildEvent(data =>
-                        {
-                            data.traits = new List<CardData.TraitStacks>()
-                            {
-                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            };
-                            data.startWithEffects = new CardData.StatusEffectStacks[]
-                            {
-                                SStack("On Flying Card Played Add Treasure To Hand", 1)
-                            };
-                            data.createScripts = new CardScript[]
-                            {
-                                GiveUpgrade(),
-                                AddRandomHealth(0,1),
-                                AddRandomDamage(-1,1),
-                                AddRandomCounter(0,1)
-                            };
-                            data.greetMessages = new string[1] { "<i>The ancient green dragon <b>Claugiyliamatar</b> is often seen with a mangled corpse dangling from her mouth.</i>" };
-                        })
-                        );
-
-                    // Ganax, Astral Hunter 
-                    assets.Add(
-                        new CardDataBuilder(this)
-                        .CreateUnit("ganaxAstralHunterLeader", "Ganax, Astral Hunter", idleAnim: "FloatAnimationProfile")
-                        .WithCardType("Leader")
-                        .SetSprites("ganax-astral-hunter-amiller.png", "companion-bg.png")
-                        .SetStats(8, 5, 5)  // 7-9, 5-6, 5
-                        .WithFlavour("\"The hum of the universe is never off-key.\"")
-                        .WithValue(25)
-                        .SubscribeToAfterAllBuildEvent(data =>
-                        {
-                            data.traits = new List<CardData.TraitStacks>()
-                            {
-                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            };
-                            data.startWithEffects = new CardData.StatusEffectStacks[]
-                            {
-                                SStack("When Flying Ally Deployed Add Treasure To Hand", 1)  // 1-2
-                            };
-                            data.greetMessages = new string[1] { "\"The hum of the universe is never off-key.\"" };
-                            data.createScripts = new CardScript[]
-                            {
-                                GiveUpgrade(),
-                                AddRandomHealth(-1,1),
-                                AddRandomDamage(0,1),
-                                AddRandomBoostEffects(0,1),
-                            };
-                        })
-                        );
-
-                    // Drakuseth, Maw of Flames 
-                    assets.Add(
-                        new CardDataBuilder(this)
-                        .CreateUnit("drakusethMawOfFlamesLeader", "Drakuseth, Maw of Flames", idleAnim: "ShakeAnimationProfile")
-                        .WithCardType("Leader")
-                        .SetSprites("drakuseth-maw-of-flames-grutkowski.png", "companion-bg.png")
-                        .SetStats(6, 3, 5)  // 6-7, 3-4, 5
-                        .WithFlavour("\"Spread out, you idiots! Spread out!\"\n<b>—Marsden, party leader, last words</b>")
-                        .WithValue(25)
-                        .SubscribeToAfterAllBuildEvent(data =>
-                        {
-                            data.traits = new List<CardData.TraitStacks>()
-                            {
-                                new CardData.TraitStacks(Get<TraitData>("Flying"), 1),
-                            };
-                            data.startWithEffects = new CardData.StatusEffectStacks[]
-                            {
-                                SStack("On Card Played Deal X Damage To Frontmost Enemy Twice", 3)
-                            };
-                            data.greetMessages = new string[1] { "\"Spread out, you idiots! Spread out!\"\n<b>—Marsden, party leader, last words</b>" };
-                            data.createScripts = new CardScript[]
-                            {
-                                GiveUpgrade(),
-                                AddRandomHealth(0,1),
-                                AddRandomDamage(0,1),
-                            };
-                        })
-                        );
-
-                }  // Leaders
             }  // Decks
 
             Effects.Load(assets, this);
@@ -2412,10 +2277,12 @@ namespace WildfrostTheGathering
 
             Generic.Clunkers.Load(assets, this);
             Generic.Companions.Load(assets, this);
+            Generic.Leaders.Load(assets, this);
             Generic.Items.Load(assets, this);
-
+            
             DragonDeck.Clunkers.Load(assets, this);
             DragonDeck.Companions.Load(assets, this);
+            DragonDeck.Leaders.Load(assets, this);
             DragonDeck.Items.Load(assets, this);
             
             preLoaded = true;
@@ -2427,12 +2294,44 @@ namespace WildfrostTheGathering
             GameMode gameMode = TryGet<GameMode>("GameModeNormal");  // GameModeNormal is the standard game mode. 
             gameMode.classes = gameMode.classes.Append(TryGet<ClassData>("Dragon")).ToArray();
             Events.OnEntityCreated += FixImage;
+            //Events.OnEntityCreated += SetupMtgBacks;
+            //Events.OnCardPooled += UndoMtgBacks;
 
             var uiText = LocalizationHelper.GetCollection("UI Text", SystemLanguage.English);
 
             uiText.SetString("Instant Tutor Card From Deck To Hand", "Add any card from your Draw Pocket to your hand");  // Demonic Tutor
             uiText.SetString("Instant Destroy Card In Deck", "Destroy 1 card in your deck");  // Advantageous Proclamation
         }
+        public static Sprite originalCardBack = null;
+        public static Sprite mtgCardBack = null;  // The ImagePath function is non-static, so I set it first chance I get
+        // To hopefully add an mtg back to my cards
+        private void SetupMtgBacks(Entity entity)
+        {
+            mtgCardBack = ImagePath("mtg-card-back.png").ToSprite();  // Right here :3
+            if (entity.data.original.ModAdded != this)
+            {
+                Debug.Log("[WTG] " + entity.name + " is not from my mod :(");
+                return;
+            }
+            Debug.Log("[WTG] Changing the card back for " + entity.data.name);
+            if (originalCardBack == null)
+            {
+                originalCardBack = ((Card)entity.display).backImage.sprite;
+            }
+            ((Card)entity.display).backImage.sprite = mtgCardBack;
+        }
+        // ... And remove them when they're repooled
+        private void UndoMtgBacks(Card card)
+        {
+            if (card.entity.data.original.ModAdded != this)
+            {
+                Debug.Log("[WTG] " + card.entity.name + " is not from my mod :(");
+                return;
+            }
+            Debug.Log("[WTG] Resetting the card back for " + card.name);
+            card.backImage.sprite = originalCardBack;
+        }
+
 
         // Show a tribe flag for leaders when selected
         [HarmonyPatch(typeof(References), nameof(References.Classes), MethodType.Getter)]
@@ -2472,6 +2371,8 @@ namespace WildfrostTheGathering
             gameMode.classes = RemoveNulls(gameMode.classes);  // Without this, a non-restarted game would crash on tribe selection
             UnloadFromClasses();
             Events.OnEntityCreated -= FixImage;
+            // Events.OnEntityCreated -= SetupMtgBacks;
+            //Events.OnCardPooled -= UndoMtgBacks;
         }
 
         // Taken from Absent Avalanche. Likely Hopeful's code tho from the tutorial. Check them both out anyways they're cool people :3
@@ -2502,9 +2403,7 @@ namespace WildfrostTheGathering
         private T[] DataList<T>(params string[] names) where T : DataFile => names.Select((s) => TryGet<T>(s)).ToArray();
 
         public CardData.StatusEffectStacks SStack(string name, int amount) => new CardData.StatusEffectStacks(TryGet<StatusEffectData>(name), amount);
-        public CardData.TraitStacks TStack(string name, int amount) => new CardData.TraitStacks(TryGet<TraitData>(name), amount);
-        public CardData.TraitStacks TStack(string name) => new CardData.TraitStacks(TryGet<TraitData>(name), 1);
-
+        public CardData.TraitStacks TStack(string name, int amount = 1) => new CardData.TraitStacks(TryGet<TraitData>(name), amount);
         public StatusEffectDataBuilder StatusCopy(string oldName, string newName)
         {
             StatusEffectData data = TryGet<StatusEffectData>(oldName).InstantiateKeepName();
@@ -2527,35 +2426,35 @@ namespace WildfrostTheGathering
         }
 
         // For creating leaders
-        internal CardScript GiveUpgrade(string name = "Crown")  // Gives a crown by default
+        internal static CardScript GiveUpgrade(string name = "Crown")  // Gives a crown by default
         {
             CardScriptGiveUpgrade script = ScriptableObject.CreateInstance<CardScriptGiveUpgrade>();  // This is the standard way of creating a ScriptableObject
             script.name = $"Give {name}";  // Name only appears in the Unity Inspector. It has no other relevance beyond that.
             script.upgradeData = TryGet<CardUpgradeData>(name);
             return script;
         }
-        internal CardScript AddRandomHealth(int min, int max)  // Boost health by a random amount
+        internal static CardScript AddRandomHealth(int min, int max)  // Boost health by a random amount
         {
             CardScriptAddRandomHealth health = ScriptableObject.CreateInstance<CardScriptAddRandomHealth>();
             health.name = "Random Health";
             health.healthRange = new Vector2Int(min, max);
             return health;
         }
-        internal CardScript AddRandomDamage(int min, int max)  // Boost damage by a ranom amount
+        internal static CardScript AddRandomDamage(int min, int max)  // Boost damage by a ranom amount
         {
             CardScriptAddRandomDamage damage = ScriptableObject.CreateInstance<CardScriptAddRandomDamage>();
             damage.name = "Give Damage";
             damage.damageRange = new Vector2Int(min, max);
             return damage;
         }
-        internal CardScript AddRandomCounter(int min, int max)  // Increase counter by a random amount
+        internal static CardScript AddRandomCounter(int min, int max)  // Increase counter by a random amount
         {
             CardScriptAddRandomCounter counter = ScriptableObject.CreateInstance<CardScriptAddRandomCounter>();
             counter.name = "Give Counter";
             counter.counterRange = new Vector2Int(min, max);
             return counter;
         }
-        internal CardScript AddRandomBoostEffects(int min, int max)  // Increase effects and trait by a random amount
+        internal static CardScript AddRandomBoostEffects(int min, int max)  // Increase effects and trait by a random amount
         {
             CardScriptAddRandomBoost boost = ScriptableObject.CreateInstance<CardScriptAddRandomBoost>();
             boost.name = "Boost Effect";
@@ -2566,9 +2465,9 @@ namespace WildfrostTheGathering
         // To not break leader sprites
         private void FixImage(Entity entity)
         {
-            if (entity.display is Card card && !card.hasScriptableImage) //These cards should use the static image
+            if (entity.display is Card card && !card.hasScriptableImage)  // These cards should use the static image
             {
-                card.mainImage.gameObject.SetActive(true);               //And this line turns them on
+                card.mainImage.gameObject.SetActive(true);  // And this line turns them on
             }
         }
 

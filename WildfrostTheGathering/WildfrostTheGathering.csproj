@@ -443,7 +443,9 @@
     <Compile Include="DragonDeck\Clunkers.cs" />
     <Compile Include="DragonDeck\Companions.cs" />
     <Compile Include="DragonDeck\Items.cs" />
+    <Compile Include="DragonDeck\Leaders.cs" />
     <Compile Include="Effects.cs" />
+    <Compile Include="Generic\Leaders.cs" />
     <Compile Include="Keywords.cs" />
     <Compile Include="Traits.cs" />
     <Compile Include="Generic\Clunkers.cs" />

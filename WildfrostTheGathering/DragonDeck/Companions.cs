@@ -13,6 +13,7 @@ namespace WildfrostTheGathering.DragonDeck
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Dragon companions loading!");
+
             // Dragon Token
             assets.Add(
                 new CardDataBuilder(wtg).CreateUnit("dragonToken", "Dragon Token", idleAnim: "FloatSquishAnimationProfile")
@@ -266,6 +267,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.traits = new List<CardData.TraitStacks>()
                     {
                             wtg.TStack("Flying", 1),
+                            wtg.TStack("Trample", 1)
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {

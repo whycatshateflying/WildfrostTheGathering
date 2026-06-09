@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Channels;
 using UnityEngine;
 using System.Text;
 using System.Threading.Tasks;
@@ -346,6 +345,30 @@ namespace WildfrostTheGathering.DragonDeck
                     data.canPlayOnHand = true;
                 })
                 );
+
+            // Monstrous Rage
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateItem("monstrousRage", "Monstrous Rage", idleAnim: "ShakeAnimationProfile")
+                .SetSprites("monstrous-rage-bpindado.png", "item-bg.png")
+                .SetDamage(null)
+                .WithFlavour("Yavimaya lights the quickest path to battle")
+                .WithValue(40)
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.attackEffects = new CardData.StatusEffectStacks[]
+                    {
+                            wtg.SStack("Spice", 2),
+                            wtg.SStack("Instant Gain Trample", 1),
+                    };
+                    data.targetConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintDoesAttack>(),
+                        new Scriptable<TargetConstraintIsUnit>()
+                    };
+                    data.canPlayOnHand = true;
+                })
+                );
+
             Debug.Log("[WTG] Dragon items loaded!");
         }
     }

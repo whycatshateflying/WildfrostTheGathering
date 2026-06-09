@@ -14,10 +14,11 @@ namespace WildfrostTheGathering
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Effects loading!");
+
             // Guttersnipe: trigger when you play an item that hits
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On Item With Attack Played")
-                .WithText("Trigger when you plan an item that hits")
+                .WithText("Trigger when you play an item that hits")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .WithIsReaction(true)
@@ -28,10 +29,20 @@ namespace WildfrostTheGathering
                         TryGet<KeywordData>("Hit"),
                     };
                     data.descColorHex = "F99C61";
-                    data.allowedCardType = ScriptableObject.CreateInstance<CardType>();
-                    data.allowedCardType.item = true;
-                    data.allowedCardType.name = "Item";
-                    data.attackGreaterThan = -1;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        };
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
                     data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
@@ -587,20 +598,23 @@ namespace WildfrostTheGathering
 
             // Terror of the Peaks: Trigger when Flying ally deployed
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXWhenDeployedNoHandIfTrait>("When Flying Ally Deployed Trigger Self")
+                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("When Flying Ally Deployed Trigger Self")
                 .WithText("Trigger when a {0} ally is deployed")
                 .WithTextInsert($"<keyword={wtg.GUID}.flying>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .WithIsReaction(true)
-                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(data =>
                 {
                     data.descColorHex = "F99C61";
                     data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = TryGet<TraitData>("Flying");
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                    });
                 })
                 );
 
@@ -615,7 +629,15 @@ namespace WildfrostTheGathering
                 {
                     data.effectToApply = TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (pred.data.name != $"{wtg.GUID}.treasure")
+                        {
+                            Debug.Log("[WTG] The card wasn't a treasure...");
+                            return false;
+                        }
+                        return true;
+                    });
                 })
                 );
 
@@ -632,8 +654,16 @@ namespace WildfrostTheGathering
                     data.descColorHex = "F99C61";
                     data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
-                    data.allowedTimes = 1;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (pred.data.name != $"{wtg.GUID}.treasure")
+                        {
+                            Debug.Log("[WTG] The card wasn't a treasure...");
+                            return false;
+                        }
+                        return true;
+                    });
+                    data.onNthTimePlayedPerTurn = [1];
                 })
                 );
 
@@ -707,11 +737,17 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.allowedTraits = new TraitData[1] { TryGet<TraitData>($"{wtg.GUID}.Flying") };
-                    data.countsSelf = true;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        {
+                            Debug.Log("[WTG] The card did not have Flying...");
+                            return false;
+                        }
+                        return true;
+                    });
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
                     data.effectToApply = TryGet<StatusEffectSnow>("Snow");
-                    data.whileActive = true;
                 })
                 );
 
@@ -796,10 +832,20 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>(data =>
                 {
                     data.summonQueue = true;
-                    data.allowedCardType = ScriptableObject.CreateInstance<CardType>();
-                    data.allowedCardType.item = true;
-                    data.allowedCardType.name = "Item";
-                    data.attackGreaterThan = 0;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (pred.data.damage < 1 || pred.data.hasAttack == false)
+                        {
+                            Debug.Log("[WTG] The card did not have enough attack...");
+                            return false;
+                        }
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item");
+                            return false;
+                        }
+                        return true;
+                    });
                     data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.applyEqualAmount = true;
@@ -1462,7 +1508,15 @@ namespace WildfrostTheGathering
                 {
                     data.effectToApply = TryGet<StatusEffectSpice>("Spice");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.allowedCards = new CardData[1] { TryGet<CardData>("treasure") };
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (pred.data.name != $"{wtg.GUID}.treasure")
+                        {
+                            Debug.Log("[WTG] The card was not a treasure...");
+                            return false;
+                        }
+                        return true;
+                    });
                 })
                 );
 
@@ -1599,19 +1653,22 @@ namespace WildfrostTheGathering
 
             // Lathliss: Summon Dragon Token when Flying ally deployed
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXWhenDeployedNoHandIfTrait>("When Flying Ally Deployed Summon Big Dragon Token With X Health")
+                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("When Flying Ally Deployed Summon Big Dragon Token With X Health")
                 .WithText("Summon a <card=whycats.wildfrost.wildfrostthegathering.bigDragonToken> with <{a}><keyword=health> whenever a {0} ally is deployed")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
-                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(data =>
                 {
                     data.summonQueue = true;
                     data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Big Dragon Token With X Health");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = TryGet<TraitData>("Flying");
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                    });
                     data.excludedCards = new List<CardData> { TryGet<CardData>("bigDragonToken") };
                 })
                 );
@@ -1677,28 +1734,37 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
                 {
-                    data.allowedTraits = new TraitData[1] { TryGet<TraitData>("whycats.wildfrost.wildfrostthegathering.Flying") };
-                    data.countsSelf = true;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        {
+                            Debug.Log("[WTG] The card did not have Flying...");
+                            return false;
+                        }
+                        return true;
+                    });
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
-                    data.whileActive = true;
                 })
                 );
 
             // Ganax: Add Treasure to hand when flying ally deployed
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXWhenDeployedNoHandIfTrait>("When Flying Ally Deployed Add Treasure To Hand")
+                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("When Flying Ally Deployed Add Treasure To Hand")
                 .WithText("Add <{a}> <card=whycats.wildfrost.wildfrostthegathering.treasure> to your hand whenever a {0} ally is deployed")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.flying>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
-                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfTrait>(data =>
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(data =>
                 {
                     data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Treasure In Hand");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.whenSelfDeployed = false;
                     data.whenAllyDeployed = true;
-                    data.wantedTrait = TryGet<TraitData>("Flying");
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                    });
                 })
                 );
 
@@ -2092,34 +2158,7 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // UNUSED: health equal to damage on leader. It functions, but the display doesn't show it as temporary which is not fun :(
-            /*
-            assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>("While Active Gain Health Equal To Damage On Leader")
-                .WithStackable(true)
-                .WithCanBeBoosted(false)
-                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesWhenLeaderTakesDamage>(data =>
-                {
-                    data.hiddenKeywords = new KeywordData[]
-                    {
-                        TryGet<KeywordData>("Active"),
-                    };
-                    data.eventPriority = 10;
-                    data.effectToApply = TryGet<StatusEffectOngoingMaxHealth>("Ongoing Increase Maximum Health");
-                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    ScriptableDamageLeaderHasTaken scriptAmount = ScriptableDamageLeaderHasTaken.CreateInstance<ScriptableDamageLeaderHasTaken>();
-                    data.scriptableAmount = scriptAmount;
-                })
-                );
-
-            assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectOngoingMaxHealth>("Ongoing Increase Maximum Health")
-                .WithStackable(true)
-                .WithCanBeBoosted(false)
-                );
-            //*/
-
-            // Test: Trample
+            // Trample trait
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectTrample>("Trample")
                 .WithStackable(true)
@@ -2128,15 +2167,226 @@ namespace WildfrostTheGathering
                 .WithVisible(true)
                 );
 
-            // Test: Temporary Trample
+            // Temporary Trample
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectSafeTemporaryTrait>("Temporary Trample")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
                 .WithIsKeyword(true)
-                .WithOffensive(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectSafeTemporaryTrait>(data =>
                 {
                     data.removeOnDiscard = false;
                     data.trait = TryGet<TraitData>("Trample");
+                })
+                );
+
+            // Monstrous Rage: Instant Gain Trample
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Gain Trample")
+                .WithText($"Add <keyword={wtg.GUID}.trample> to the target")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Trample");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            // Overseer of the damned: Summon Zombie Token when an enemy is killed            
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenUnitIsKilled>("Summon Zombie When Enemy Killed")
+                .WithText($"Summon <card={wtg.GUID}.zombieToken> when an enemy is killed")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenUnitIsKilled>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Zombie Token");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.queue = true;
+                    data.enemy = true;
+                    data.ally = false;
+                })
+                );
+
+            // Instant Summon Zombie Token
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantSummon>("Instant Summon Zombie Token")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Zombie Token");
+                })
+                );
+
+            // Summon Zombie Token
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSummon>("Summon Zombie Token")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.summonCard = TryGet<CardData>("zombieToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
+                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
+                })
+                );
+
+            // Tetzimoc, primal death: apply prey while in hand at the end of each turn
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnTurnEndWhileInHand>("While In Hand Post Turn Apply Prey To Random Enemy")
+                .WithText($"While in hand, add <keyword={wtg.GUID}.prey> to a random enemy")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnTurnEndWhileInHand>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectTemporaryTrait>("Temporary Prey");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
+                })
+                );
+
+            // Tetzimoc: Temporary Prey
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSafeTemporaryTrait>("Temporary Prey")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .WithIsKeyword(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSafeTemporaryTrait>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("Prey");
+                })
+                );
+
+            // Tetzimoc: When Deployed, kill all prey enemies
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployed>("When Deployed Kill Enemies With Prey")
+                .WithText($"When deployed, kill all <keyword={wtg.GUID}.prey>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantKill>("Kill");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Enemies;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet<TraitData>("Prey");
+                            tcht.ignoreSilenced = true;
+                        })
+                    };
+                    data.whenSelfDeployed = true;
+                    data.whenAllyDeployed = false;
+                    data.whenEnemyDeployed = false;
+                })
+                );
+
+            // Ongoing Trample
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectTrampleOnce>("Ongoing Trample")
+                .WithText($"{{0}} - <keyword={wtg.GUID}.trample>")
+                .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectTrampleOnce>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Active"),
+                    };
+                })
+                );
+
+            // Add Ongoing Trample to Self And Allies
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployed>("When Deployed Add Ongoing Trample To Self And Allies")
+                .WithText($"When deployed, add \"{{0}} - <keyword={wtg.GUID}.trample>\" to self and allies\"")
+                .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectTrampleOnce>("Ongoing Trample");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Self;
+                    data.whenAllyDeployed = false;
+                    data.whenSelfDeployed = true;
+                    data.whenEnemyDeployed = false;
+                })
+                );
+
+            // Craterhoof Behemoth: Add Spice to allies equal to allies
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployed>("Instant Apply Spice To Self And Allies Equal To Self And Allies")
+                .WithText($"When Deployed, apply <keyword=spice> to self and allies equal to the number of allies on the field")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectSpice>("Spice");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self | StatusEffectApplyX.ApplyToFlags.Allies;
+                    data.whenAllyDeployed = false;
+                    data.whenSelfDeployed = true;
+                    data.whenEnemyDeployed = false;
+                    ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
+                    scriptAmount.allies = true;
+                    scriptAmount.self = true;
+                    data.scriptableAmount = scriptAmount;
+                    data.applyEqualAmount = true;
+                })
+                );
+
+            // Gadrak: Only count down while Treasure in hand
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectOnlyCountDownWhenPredicate>("Only Count Down While Treasure In Hand")
+                .WithText($"Only counts down <keyword=counter> while you have a <card={wtg.GUID}.treasure> in hand")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectOnlyCountDownWhenPredicate>(data =>
+                {
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return References.Player.handContainer.Any<Entity>(c => c.name == $"{wtg.GUID}.treasure");
+                    });
+                })
+                );
+
+            // Helga: Gain Attack And Health And Draw When Ally with 3 Counter Is Deployed
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("Gain Attack And Health And Draw When Ally with 3 Counter Is Deployed")
+                .WithText($"Gain <+{{a}}><keyword=health>, <+{{a}}><keyword=attack>, and <keyword=draw> <{{a}}> when you deploy an ally with 4 or higher<keyword=counter>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Instant Gain Attack Health Draw");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.whenSelfDeployed = false;
+                    data.whenAllyDeployed = true;
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return pred.data.counter >= 4;
+                    });
+                })
+                );
+
+            // Helga: do the three things
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantMultiple>("Instant Gain Attack Health Draw")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantMultiple>(data =>
+                {
+                    data.effects = new StatusEffectInstant[]
+                    {
+                        TryGet<StatusEffectInstant>("Increase Max Health"),
+                        TryGet<StatusEffectInstant>("Increase Attack"),
+                        TryGet<StatusEffectInstantDraw>("Instant Draw"),
+                    };
                 })
                 );
 

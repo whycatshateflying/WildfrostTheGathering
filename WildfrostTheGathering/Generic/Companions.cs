@@ -202,21 +202,98 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Colossal Dreadmaw
+            // Siege Rhino
             assets.Add(new CardDataBuilder(wtg)
-                .CreateUnit("colossalDreadmaw", "Colossal Dreadmaw", idleAnim: "GiantAnimationProfile")
-                .SetStats(6, 6, 4)
+                .CreateUnit("siegeRhino", "Siege Rhino", idleAnim: "GiantAnimationProfile")
+                .SetStats(6, 5, 4)
                 .WithPools("GeneralUnitPool")
-                .SetSprites("hydra-omnivore-svelinov.png", "companion-bg.png")
+                .SetSprites("siege-rhino-vbaga.png", "companion-bg.png")
                 .WithValue(50)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
                     {
-                        wtg.TStack("Trample", 1)
+                        wtg.TStack("Spark", 1),
+                        wtg.TStack("Trample", 1),
                     };
-                    data.greetMessages = new string[] { "BALLS" };
+                    data.greetMessages = new string[] { "The mere approach of an Abzan war beast is enough to send enemies fleeing in panic" };
                 })
+                );
+
+            // Overseer of the damned (no art!)
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateUnit("overseerOfTheDamned", "Overseer of the Damned", idleAnim:"FloatAnimationProfile")
+                .SetStats(7, 5, 5)
+                .WithPools("GeneralUnitPool")
+                .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithValue(50)
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.traits = new List<CardData.TraitStacks>
+                    {
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("Spark", 1),
+                    };
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
+                    {
+                        wtg.SStack("Summon Zombie When Enemy Killed", 1)
+                    };
+                    data.greetMessages = new string[] { "Death in form and function",
+                                                        "Rise, my pretty thing. Why rot in the river when you can serve at my bidding?"};
+                })
+                );
+
+            // Overseer of the damned Zombie Token (no art!)
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateUnit("zombieToken", "Zombie Token", idleAnim:"SwayAnimationProfile")
+                .SetStats(2, 2, 5)
+                .WithCardType("Summoned")
+                .SetSprites("dragon-baby.png", "companion-bg.png")
+                .WithValue(25)
+                );
+
+            // Tetzimoc, Primal Death (no art!)
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateUnit("tetzimocPrimalDeath", "Tetzimoc, Primal Death", idleAnim:"GiantAnimationProfile")
+                .SetStats(6, 6, 4)
+                .WithPools("GeneralUnitPool")
+                .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithValue(50)
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.traits = new List<CardData.TraitStacks>
+                    {
+                        wtg.TStack("Pigheaded", 1),
+                    };
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
+                    {
+                        wtg.SStack("While In Hand Post Turn Apply Prey To Random Enemy", 1),
+                        wtg.SStack("When Deployed Kill Enemies With Prey", 1),
+                    };
+                    data.greetMessages = new string[] { "The embodiment of death itself on <b>Ixalan</b>" };
+                })
+                );
+
+            // Craterhoof Behemboth (no art!)
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateUnit("craterhoofBehemoth", "Craterhoof Behemoth", idleAnim:"GiantAnimationProfile")
+                .SetStats(6, 4, 5)
+                .WithPools("GeneralUnitPool")
+                .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithValue(50)
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.traits = new List<CardData.TraitStacks>
+                    {
+                        wtg.TStack("Spark", 1),
+                    };
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
+                    {
+                        wtg.SStack("When Deployed Add Ongoing Trample To Self And Allies", 1),
+                        wtg.SStack("Instant Apply Spice To Self And Allies Equal To Self And Allies", 1),
+                    };
+                    data.greetMessages = new string[] { "Its footsteps of today are the lakes of tomorrow" };
+                    })
                 );
 
             Debug.Log("[WTG] Generic companions loaded!");
