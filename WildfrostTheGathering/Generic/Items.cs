@@ -405,7 +405,7 @@ namespace WildfrostTheGathering.Generic
                     };
                     data.attackEffects = new CardData.StatusEffectStacks[]
                     {
-                            wtg.SStack("Reduce Max Health", 2),
+                            wtg.SStack("Reduce Max Health", 4),
                     };
                     data.canPlayOnHand = true;
                 })
@@ -507,7 +507,7 @@ namespace WildfrostTheGathering.Generic
             // Beast Within: Beast Token
             assets.Add(new CardDataBuilder(wtg).CreateUnit("beastToken", "Beast Token", idleAnim: "GiantAnimationProfile")
                 .SetSprites("beast-token-jejsing.png", "companion-bg.png")
-                .SetStats(4, 3, 4)
+                .SetStats(3, 3, 4)
                 .WithCardType("Summoned")
                 .WithValue(25)
                 .SubscribeToAfterAllBuildEvent(data =>
@@ -526,9 +526,9 @@ namespace WildfrostTheGathering.Generic
                 .WithValue(50)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
-                    data.attackEffects = new CardData.StatusEffectStacks[]
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
-                            wtg.SStack("Instant Summon Beast On Other Side", 1),
+                            wtg.SStack("Summon Beast On Hit", 1),
                     };
                 })
                 );

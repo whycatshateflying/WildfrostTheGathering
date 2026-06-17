@@ -83,21 +83,30 @@ namespace WildfrostTheGathering
                 .WithCanStack(false)
                 );
 
-            // Draw Pocket
+            // Discard Pocket
             assets.Add(new KeywordDataBuilder(wtg)
                 .Create("discardpocket")
                 .WithTitle("Discard Pocket")
                 .WithShowName(true)
-                .WithDescription($"Cards without <keyword=consume> go here when played|Shuffles into the Draw Pocket when it runs out")
+                .WithDescription($"Items without <keyword=consume> and recalled units go here when played|Shuffles into the Draw Pocket when it runs out")
                 .WithCanStack(false)
                 );
 
-            // Discard Pocket
+            // Draw Pocket
             assets.Add(new KeywordDataBuilder(wtg)
                 .Create("drawpocket")
                 .WithTitle("Draw Pocket")
                 .WithShowName(true)
                 .WithDescription($"Cards are drawn from this pile|When it runs out, the Discard Pocket is shuffled and moved here")
+                .WithCanStack(false)
+                );
+
+            // Discard Pocket
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("redrawbell")
+                .WithTitle("Redraw Bell")
+                .WithShowName(true)
+                .WithDescription($"Hitting Redraw Bell draws a new hand|Does not take a turn if it\'s charged!")
                 .WithCanStack(false)
                 );
 
@@ -120,6 +129,24 @@ namespace WildfrostTheGathering
                 .WithCanStack(false)
                 );
 
+            // Ramp
+            assets.Add(new KeywordDataBuilder(wtg)
+                .Create("ramp")
+                .WithTitle("Ramp")
+                .WithShowName(true)
+                .WithDescription("Add <keyword=zoomlin> to random cards in hand")
+                .WithCanStack(true)
+                );
+
+            // Suspected
+            assets.Add(
+                new KeywordDataBuilder(wtg)
+                .Create("suspected")
+                .WithTitle("Suspected")  // The in-game name for the upgrade.
+                .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                .WithDescription("Deals half damage, but also hits target behind") //Format is body|note.
+                .WithCanStack(false)  // The keyword does not show its stack number.
+                );
             Debug.Log("[WTG] Keywords loaded!");
         }
     }

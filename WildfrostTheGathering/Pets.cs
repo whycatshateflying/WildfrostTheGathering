@@ -1,4 +1,5 @@
 ﻿using Deadpan.Enums.Engine.Components.Modding;
+using FrostEyeMakerExtensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,6 +37,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("air-elemental-kwalker.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.31f, 0.95f, 0.50f, 0.50f).AddEye(0.46f, 0.9f, 0.50f, 0.50f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
@@ -52,6 +54,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("ball-lightning-tclaxton.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.14f, 0.76f).AddEye(-0.46f, 0.97f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
@@ -84,6 +87,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("atog-puddnhead.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.11f, 1.21f).AddEye(-0.3f, 1.17f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -100,6 +104,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("llanowar-elves-kwalker.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.16f, 1.12f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -117,6 +122,7 @@ namespace WildfrostTheGathering
                 .SetSprites("grizzly-bears-jamenges.png", "companion-bg.png")
                 .WithFlavour("Don\'t try to outrun one of Dominia\'s Grizzlies; it\'ll catch you, knock you down, and eat you. Of course, you could run up a tree. In that case you\'ll get a nice view before it knocks the tree down and eats you.")
                 .WithValue(50)
+                .AddEye(-0.49f, 1.22f, 0.5f, 0.5f).AddEye(-0.3f, 1.19f, 0.5f, 0.5f)
                 );
 
             // Juggernaut
@@ -126,6 +132,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("juggernaut-kwalker.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.06f, 1.11f, 0.5f, 0.5f).AddEye(-0.33f, 1.03f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -142,6 +149,7 @@ namespace WildfrostTheGathering
                 .IsPet((ChallengeData)null, true)
                 .SetSprites("guttersnipe-mkollros.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.32f, 1.17f, 0.5f, 0.5f).AddEye(-0.05f, 1.18f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]

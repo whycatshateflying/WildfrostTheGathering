@@ -1,4 +1,5 @@
 ﻿using Deadpan.Enums.Engine.Components.Modding;
+using FrostEyeMakerExtensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -55,6 +56,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .SetStats(8, 3, 5)  // 8-9, 3-4, 5
                 .WithFlavour("\"Do you have tales of the world outside? It\'s been so long since I've left <b>Candlekeep</b>\"")
                 .WithValue(25)
+                .AddEye(-0.36f, 0.93f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>()
@@ -84,6 +86,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .SetStats(7, 3, 4)  // 7-8, 3-4, 3-5
                 .WithFlavour("<i>Sages whisper that <b>Lathliss</b> still keeps the heart of the old dragon queen sealed within a jewel, its smoldering warmth an eternal reminder that no monarch is untouchable</i>")
                 .WithValue(25)
+                .AddEye(-0.07f, 1.51f, 0.25f, 0.25f).AddEye(0.04f, 1.52f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>()
@@ -144,6 +147,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .SetStats(8, 5, 5)  // 7-9, 5-6, 5
                 .WithFlavour("\"The hum of the universe is never off-key.\"")
                 .WithValue(25)
+                .AddEye(0.16f, 1.06f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>()
@@ -194,13 +198,14 @@ namespace WildfrostTheGathering.DragonDeck
                 })
                 );
 
-            // Gadrak (no art!)
+            // Gadrak
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("gadrakTheCrownScourgeLeader", "Gadrak, the Crown-Scourge", idleAnim: "FloatAnimationProfile")
                 .WithCardType("Leader")
                 .SetStats(7, 3, 2)  // 7-8, 3-4, 2
-                .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .SetSprites("gadrak-crown-scourge-daarken.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.28f, 0.91f, 0.5f, 0.5f).AddEye(0.0f, 1.03f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>

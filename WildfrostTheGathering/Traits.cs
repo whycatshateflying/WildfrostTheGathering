@@ -120,6 +120,17 @@ namespace WildfrostTheGathering
                 })
                 );
 
+            // Suspected
+            assets.Add(
+                new TraitDataBuilder(wtg)
+                .Create("Suspected")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = TryGet<KeywordData>("suspected");
+                    trait.effects = new StatusEffectData[] { TryGet<WildfrostTheGathering.StatusEffectSuspected>("Suspected") };
+                })
+                );
+
             Debug.Log("[WTG] Traits loaded!");
         }
     }

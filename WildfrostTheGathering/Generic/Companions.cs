@@ -1,4 +1,5 @@
 ﻿using Deadpan.Enums.Engine.Components.Modding;
+using FrostEyeMakerExtensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +21,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("SnowUnitPool")
                 .SetSprites("fear-of-sleep-paralysis-jraphael.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.2f, 1.48f, 0.25f, 0.25f).AddEye(0.28f, 1.46f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
@@ -42,6 +44,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("mulldrifter-efortune.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.25f, 0.49f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
@@ -63,6 +66,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("nulldrifter-jbodin.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.18f, 0.84f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
@@ -88,6 +92,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("deadeye-navigator-lsetiawan.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.09f, 1.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -105,6 +110,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("beast-whisperer-mstewart.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.45f, 1.27f, 0.5f, 0.5f).AddEye(-0.28f, 1.27f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -141,6 +147,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("laboratory-maniac-jfelix.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.31f, 1.17f, 0.25f, 0.25f).AddEye(0.23f, 1.16f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -175,6 +182,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("deaths-shadow-hlyon.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(-0.07f, 1.51f, 0.25f, 0.25f).AddEye(-0.11f, 1.44f, 0.25f, 0.25f).AddEye(-0.02f, 1.46f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -192,6 +200,7 @@ namespace WildfrostTheGathering.Generic
                 .WithPools("GeneralUnitPool")
                 .SetSprites("hydra-omnivore-svelinov.png", "companion-bg.png")
                 .WithValue(50)
+                .AddEye(0.78f, 0.71f, 0.5f, 0.5f).AddEye(1.01f, 1.33f, 0.25f, 0.25f).AddEye(-0.11f, 1.61f, 0.5f, 0.5f).AddEye(-0.72f, 1.3f, 0.25f, 0.25f).AddEye(-0.3f, 0.17f, 0.25f, 0.25f).AddEye(-0.94f, 0.71f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>

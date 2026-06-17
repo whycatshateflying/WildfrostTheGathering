@@ -18,7 +18,7 @@ namespace WildfrostTheGathering
             // Guttersnipe: trigger when you play an item that hits
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On Item With Attack Played")
-                .WithText("Trigger when you play an item that hits")
+                .WithText("Trigger when an item hits")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .WithIsReaction(true)
@@ -71,7 +71,7 @@ namespace WildfrostTheGathering
             // Draw cards on played (not boostable)
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Draw Cards (Not Boostable)")
-                .WithText("Draw {a} cards")
+                .WithText("<keyword=draw> {a} cards")
                 .WithStackable(true)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -105,17 +105,23 @@ namespace WildfrostTheGathering
             // Rampant Growth Apply Noomlin to a random card in hand on card played
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Gain Noomlin To Random Card In Hand")
-                .WithText("Add <keyword=noomlin> to a random card in your hand")
+                .WithText("Add <keyword=noomlin> to a random card without <keyword=zoomlin> in your hand")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.targetConstraints = new TargetConstraint[]
+                    data.applyConstraints = new TargetConstraint[]
                     {
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
                             tcht.not = true;
                             tcht.trait = TryGet<TraitData>("Noomlin");
+                            tcht.ignoreSilenced = false;
+                        }),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.not = true;
+                            tcht.trait = TryGet<TraitData>("Zoomlin");
                             tcht.ignoreSilenced = false;
                         }),
                         new Scriptable<TargetConstraintHasStatus>(tchs =>
@@ -273,10 +279,6 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXOnce>(data =>
                 {
-                    data.hiddenKeywords = new KeywordData[]
-                    {
-                        TryGet<KeywordData>("Active"),
-                    };
                     data.effectToApply = TryGet<StatusEffectMultiHit>("MultiHit");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
@@ -350,18 +352,31 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Beast Within: Summon Beast Token on other side
+            // Beast Within: Summon Beast Token on play
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectInstantSummon>("Instant Summon Beast On Other Side")
-                .WithText("Summon {0} on the other side")
-                .WithTextInsert($"<card={wtg.GUID}.beastToken>")
+                .Create<StatusEffectApplyXOnHit>("Summon Beast On Hit")
+                .WithText($"Summon <card={wtg.GUID}.beastToken>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnHit>(data =>
+                {
+                    data.eventPriority = -999;
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Beast");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.FrontAlly;
+                    data.doPing = false;
+                })
+                );
+
+            // Beast Within: Summon Beast Token
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantSummon>("Instant Summon Beast")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
                     data.eventPriority = 99999;
                     data.targetSummon = TryGet<StatusEffectSummon>("Summon Beast Token");
-                    data.summonPosition = StatusEffectInstantSummon.Position.EnemyRow;
+                    data.summonPosition = StatusEffectInstantSummon.Position.InFrontOf;
                 })
                 );
 
@@ -472,7 +487,7 @@ namespace WildfrostTheGathering
                     })
                     );
 
-            // Draw on destroy
+            // When Destroyed Draw
             assets.Add(new StatusEffectDataBuilder(wtg)
                     .Create<StatusEffectApplyXWhenDestroyedUpdateDesc>("When Destroyed Draw")
                     .WithText("When destroyed, <Draw> <{a}>")
@@ -641,7 +656,7 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Trigger when Treasure is played
+            // Trigger when first Treasure is played
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On First Treasure")
                 .WithText("Trigger the first time you play a {0} each turn")
@@ -709,14 +724,17 @@ namespace WildfrostTheGathering
 
             // Earthquake Dragon: While active, reduce counter by number of allies with flying
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectWhileActiveXUpdatesOnTrait>("While Active Reduce Counter By Allies With Flying")
+                .Create<StatusEffectWhileActiveXUpdatesOnPredicateDeployed>("While Active Reduce Counter By Allies With Flying")
                 .WithText("While active, reduce own <keyword=counter> by the number of {0} allies")
                 .WithTextInsert($"<keyword={wtg.GUID}.flying>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
-                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesOnTrait>(data =>
+                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesOnPredicateDeployed>(data =>
                 {
-                    data.alsoActivate = TryGet<TraitData>("Flying");
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                    });
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
                     scriptAmount.hasTrait = TryGet<TraitData>("Flying");
@@ -825,7 +843,7 @@ namespace WildfrostTheGathering
             // Manaform Hellkite: Instant Summon Dragon Token on Item played
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>("Summon Dragon Token On Item Played")
-                .WithText("Summon a {0} with <keyword=attack> equal to the <keyword=attack> of items you play")
+                .WithText("Summon a {0} with equal <keyword=attack> when an item deals damage")
                 .WithTextInsert($"<card={wtg.GUID}.dragonTokenSpark>")
                 .WithStackable(true)
                 .WithCanBeBoosted(false)
@@ -899,7 +917,7 @@ namespace WildfrostTheGathering
             // Treasure: Funny temporary Zoomlin
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectSafeTemporaryTrait>("Safe Temporary Zoomlin")
-                .WithIsKeyword(true)    // This effect adds text to the card. 
+                .WithIsKeyword(true)  // This effect adds text to the card. 
                 .SubscribeToAfterAllBuildEvent<StatusEffectSafeTemporaryTrait>(data =>
                 {
                     data.targetConstraints = new TargetConstraint[]
@@ -1159,10 +1177,10 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Explosive Vegetation: Add "Instant add zoomlin to X random cards in hand" to self
+            // Ramp: Add "Instant add zoomlin to X random cards in hand" to self
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Gain Zoomlin To X Random Cards In Hand")
-                .WithText("Add <keyword=zoomlin> to <{a}> random cards in hand")
+                .WithText($"<keyword={wtg.GUID}.ramp> <{{a}}>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -1172,10 +1190,10 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Explosive Vegetation: Add Zoomlin to a random card in hand
+            // Add Zoomlin to a random card in hand
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand")
-                .WithStackable(false)
+                .WithStackable(true)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXMultipleInstant>(data =>
                 {
@@ -1205,6 +1223,10 @@ namespace WildfrostTheGathering
                                 tchs.not = true;
                                 tchs.status = TryGet < StatusEffectFreeAction >("Free Action (Zoomlin)");
                             }),
+                            new Scriptable<TargetConstraintBeingPlayed>(tcbp =>
+                            {
+                                tcbp.not = true;
+                            })
                     };
                 })
                 );
@@ -1296,19 +1318,19 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Sol Ring: When destroyed, counter leader down by X
+            // Lotus Petal: When destroyed, counter leader down by X
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXWhenDestroyed>("When Destroyed Count Down Leader By X")
                 .WithCanBeBoosted(true)
                 .WithStackable(true)
-                .WithText("When destroyed, count down your leader by <{a}>")
+                .WithText("When destroyed, count down your leader\'s<keyword=counter>by <{a}>")
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDestroyed>(data =>
                 {
                     data.effectToApply = TryGet<StatusEffectInstantReduceCounter>("Reduce Counter");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintIsLeader>(),
+                        new Scriptable<TargetConstraintIsLeader>(),
                     };
                     data.targetMustBeAlive = false;
                 })
@@ -1332,15 +1354,15 @@ namespace WildfrostTheGathering
                     };
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintOr>(tco =>
-                            {
-                                tco.constraints = new TargetConstraint[] {
-                                    new Scriptable<TargetConstraintHasReaction>(),
-                                    new Scriptable<TargetConstraintMaxCounterMoreThan>(tcmcmt =>
-                                    {
-                                        tcmcmt.moreThan = 0;
-                                    })};
-                            })
+                        new Scriptable<TargetConstraintOr>(tco =>
+                        {
+                            tco.constraints = new TargetConstraint[] {
+                                new Scriptable<TargetConstraintHasReaction>(),
+                                new Scriptable<TargetConstraintMaxCounterMoreThan>(tcmcmt =>
+                                {
+                                    tcmcmt.moreThan = 0;
+                                })};
+                        })
                     };
                 })
                 );
@@ -1529,10 +1551,6 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
-                    data.hiddenKeywords = new KeywordData[]
-                    {
-                                TryGet < KeywordData >("Active"),
-                    };
                     data.eventPriority = 10;
                     data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
@@ -1667,7 +1685,11 @@ namespace WildfrostTheGathering
                     data.whenAllyDeployed = true;
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        {
+                            return false;
+                        }
+                        return true;
                     });
                     data.excludedCards = new List<CardData> { TryGet<CardData>("bigDragonToken") };
                 })
@@ -2355,10 +2377,10 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Helga: Gain Attack And Health And Draw When Ally with 3 Counter Is Deployed
+            // Helga: Gain Attack And Health And Draw When Ally with 4 Counter Is Deployed
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("Gain Attack And Health And Draw When Ally with 3 Counter Is Deployed")
-                .WithText($"Gain <+{{a}}><keyword=health>, <+{{a}}><keyword=attack>, and <keyword=draw> <{{a}}> when you deploy an ally with 4 or higher<keyword=counter>")
+                .Create<StatusEffectApplyXWhenDeployedNoHandIfPredicate>("Gain Attack And Health And Draw When Ally with 4 Counter Is Deployed")
+                .WithText($"Gain <+{{a}}><keyword=health>, <+{{a}}><keyword=attack>, and <keyword=draw> <{{a}}> when an ally with 4 or higher<keyword=counter>is deployed")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHandIfPredicate>(data =>
@@ -2386,6 +2408,529 @@ namespace WildfrostTheGathering
                         TryGet<StatusEffectInstant>("Increase Max Health"),
                         TryGet<StatusEffectInstant>("Increase Attack"),
                         TryGet<StatusEffectInstantDraw>("Instant Draw"),
+                    };
+                })
+                );
+
+            // Omnath: Restore health when you play the first hitting item a turn
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Restore Health On First Hit Item")
+                .WithText("Restore <{a}><keyword=health>the first time an item hits each turn")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.effectToApply = TryGet<StatusEffectInstantHeal>("Heal");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.onNthTimePlayedPerTurn = [1];
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                );
+
+            // Omnath: Add zoomlin when you play the second hitting item a turn
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Zoomlin On Second Hit Item")
+                .WithText($"<keyword={wtg.GUID}.ramp> <{{a}}> the second time")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.effectToApply = TryGet<StatusEffectApplyXMultipleInstant>("Instant Gain Zoomlin To Random Card In Hand");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.onNthTimePlayedPerTurn = [2];
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                );
+
+            // Omnath: Restore health when you play the first hitting item a turn
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger On Third Hit Item")
+                .WithText("Trigger the third time")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .WithIsReaction(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.descColorHex = "F99C61";
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.onNthTimePlayedPerTurn = [3];
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                );
+
+            // Isshin: Add Ongoing Frenzy to row
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Ongoing Frenzy To AlliesInRow")
+                .WithText("Add \"{0} - <x{a}><keyword=frenzy>\" to allies in row")
+                .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.eventPriority = 10;
+                    data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AlliesInRow;
+                })
+                );
+
+            // Valgavoth: Gain attack on first enemy damage taken
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenPredicateDamageTaken>("Gain Attack On First Time Enemy Damaged Each Turn")
+                .WithText("Gain <+{a}><keyword=attack> the first time an enemy loses health each turn")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenPredicateDamageTaken>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.onNthTimeDamagedPerTurn = [1];
+                    data.predButFancy = new Func<Entity, Entity, bool>((hitTarget, target) =>
+                    {
+                        if (hitTarget is null || target is null)
+                        {
+                            return false;
+                        }
+                        if (hitTarget.owner == target.owner)
+                        {
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                );
+
+            // Obeka: Add Null To Allies And Enemies
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add Null To Allies And Enemies")
+                .WithText("Apply <{a}><keyword=null> to allies and enemies")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectNull>("Null");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
+                })
+                );
+
+            // Instant Charge redraw bell
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantChargeBell>("Instant Charge Redraw Bell Fully")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                );
+
+            // Obeka: Charge redraw bell on attack
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Charge Redraw Bell Fully")
+                .WithText($"Charge the <keyword={wtg.GUID}.redrawbell>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantChargeBell>("Instant Charge Redraw Bell Fully");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+            
+            // Zozu: When anyone with unit deployed, trigger against them
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployedNoHand>("On Card With Counter Deployed Trigger Against Them")
+                .WithText("Trigger against units with<keyword=counter>when they're deployed")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedNoHand>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantTriggerAgainst>("Trigger Against");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Target;
+                    data.whenAllyDeployed = true;
+                    data.whenEnemyDeployed = true;
+                    data.whenSelfDeployed = false;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintCounterMoreThan>(tccmt =>
+                        {
+                            tccmt.value = 0;
+                        })
+                    };
+                })
+                );
+
+            // Minn: Spawn Illusion when redraw bell hit while charged
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenRedrawHitIfCharged>("Summon Minnllusion When Charged Redraw Bell Hit")
+                .WithText($"Summon <card={wtg.GUID}.minnllusionToken> when <keyword={wtg.GUID}.redrawbell> is hit while charged")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenRedrawHitIfCharged>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Minnllusion");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            // Minn: Summon Illusion Token
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantSummon>("Instant Summon Minnllusion")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Minnllusion Token");
+                    data.summonPosition = StatusEffectInstantSummon.Position.InFrontOf;
+                })
+                );
+
+            // Summon Illusion Token
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSummon>("Summon Minnllusion Token")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.summonCard = TryGet<CardData>("minnllusionToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
+                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
+                })
+                );
+
+            // Minnlusion: While active, gain attack equal to other minnlusions
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectWhileActiveXUpdatesOnPredicateDeployed>("While Active Gain Attack For Minnllusion tokens")
+                .WithText($"While active, gain<keyword=attack>for each <card={wtg.GUID}.minnllusionToken> on the field")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveXUpdatesOnPredicateDeployed>(data =>
+                {
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        Debug.Log("[WTG] Checking " + pred.data.name);
+                        return pred.data.name == $"{wtg.GUID}.minnllusionToken";
+                    });
+                    data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
+                    scriptAmount.allies = true;
+                    scriptAmount.enemies = true;
+                    scriptAmount.self = true;
+                    scriptAmount.names = [$"{wtg.GUID}.minnllusionToken"];
+                    data.scriptableAmount = scriptAmount;
+                    data.applyEqualAmount = true;
+                })
+                );
+
+            // Rankle: Ongoing Flying
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectTemporaryTraitOnce>("Ongoing Flying")
+                .WithText($"<keyword={wtg.GUID}.ongoing> -")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTraitOnce>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("Flying");
+                })
+                );
+
+            // Rankle: Ongoing Barrage
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectTemporaryTraitOnce>("Ongoing Barrage")
+                .WithText($"<keyword={wtg.GUID}.ongoing> -")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTraitOnce>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("Barrage");
+                })
+                );
+
+            // Rankle: After turn, gain Ongoing barrage or flying, draw 1 randomly
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXAfterTurn>("After Turn Randomly Gain Ongoing Flying Or Ongoing Barrage")
+                .WithText($"After attacking, randomly gain \"<keyword={wtg.GUID}.ongoing> - <keyword={wtg.GUID}.flying>\" or \"<keyword={wtg.GUID}.ongoing> - <keyword=barrage>\"")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXAfterTurn>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying");
+                    data.effects = [TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying"), TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Barrage")];
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.targetMustBeAlive = false;
+                })
+            );
+
+            // Proft: Kill clue behind to Draw and Restore 1
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Apply Instant Draw Restore To Applier And Kill To Clue Behind")
+                .WithText($"Kill <card={wtg.GUID}.clueToken> behind to <keyword=draw> <{{a}}> and Restore <{{a}}><keyword=health>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Instant Draw Restore To Applier And Kill");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                    data.eventPriority = -999;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintIsSpecificCard>(tcisc =>
+                        {
+                            tcisc.allowedCards = [ TryGet<CardData>("clueToken") ];
+                        })
+                    };
+                    data.countsAsHit = true;
+                })
+                );
+            
+            // Proft: instant draw, restore health to applier, and kill
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantMultiple>("Instant Draw Restore To Applier And Kill")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantMultiple>(data =>
+                {
+                    data.effects = new StatusEffectInstant[]
+                    {
+                        TryGet<StatusEffectInstantDraw>("Instant Draw"),
+                        TryGet<StatusEffectInstantKill>("Kill")
+                    };
+                    data.applyXEffects = new StatusEffectApplyXInstant[]
+                    {
+                        TryGet<StatusEffectApplyXInstant>("Restore Health To Applier")
+                    };
+                })
+                );
+            
+            // Proft: Restore health to applier
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Restore Health To Applier")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantHeal>("Heal");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Applier;
+                })
+                );
+
+            // Proft: when deployed summon clues
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployed>("When Deployed Summon Multiple ClueTokens")
+                .WithText($"When deployed, summon <{{a}}> <card={wtg.GUID}.clueToken><s>")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.effectToApply = TryGet<StatusEffectApplyXMultipleInstant>("Instant Summon Multiple ClueTokens");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.waitForAnimationEnd = true;
+                    data.queue = true;
+                })
+                );
+
+            // Proft: Instant summon multiple clues
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXMultipleInstant>("Instant Summon Multiple ClueTokens")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXMultipleInstant>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon ClueToken");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.useSummonQueue = true;
+                })
+                );
+
+            // Proft: instant summon clue
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantSummon>("Instant Summon ClueToken")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon ClueToken");
+                    data.summonPosition = StatusEffectInstantSummon.Position.InFrontOf;
+                })
+                );
+
+            // Proft: summon clue
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSummon>("Summon ClueToken")
+                .WithText($"Summon <card={wtg.GUID}.clueToken>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.summonCard = TryGet<CardData>("clueToken");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
+                })
+                );
+
+            // Suspected
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSuspected>("Suspected")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .WithIsStatus(true)
+                .WithVisible(true)
+                );
+
+            // Nelly Borca: Add Suspected and Ongoing Frenzy to random enemy
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add Suspected And Ongoing Frenzy To Random Enemy")
+                .WithText($"Add <keyword={wtg.GUID}.suspected> and \"<keyword={wtg.GUID}.ongoing> - <x{{a}}><keyword=frenzy>\" to a random enemy")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Instant Gain Suspected And Ongoing Frenzy");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintOr>(tco =>
+                        {
+                            tco.constraints = new TargetConstraint[] {
+                                new Scriptable<TargetConstraintHasReaction>(),
+                                new Scriptable<TargetConstraintMaxCounterMoreThan>(tcmcmt =>
+                                {
+                                    tcmcmt.moreThan = 0;
+                                })};
+                        })
+                    };
+                })
+                );
+
+            // Nelly Borca: Instant gain suspected and ongoing frenzy
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantMultiple>("Instant Gain Suspected And Ongoing Frenzy")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantMultiple>(data =>
+                {
+                    data.applyXEffects = new StatusEffectApplyXInstant[]
+                    {
+                        TryGet<StatusEffectApplyXInstant>("Instant Gain Suspected"),
+                        TryGet<StatusEffectApplyXInstant>("Instant Gain Ongoing Frenzy"),
+                    };
+                })
+                );
+
+            // Instant Gain Ongoing Frenzy
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Gain Ongoing Frenzy")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.eventPriority = 10;
+                    data.effectToApply = TryGet<StatusEffectWhileActiveXOnce>("Ongoing Frenzy");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            // Instant Gain Suspected
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Gain Suspected")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectSafeTemporaryTrait>("Temporary Suspected");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+
+            // Temporary Suspected
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSafeTemporaryTrait>("Temporary Suspected")
+                .WithIsKeyword(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSafeTemporaryTrait>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("Suspected");
+                })
+                );
+
+            // Nelly Borca: Add Suspected and Ongoing Frenzy to random enemy
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Apply Haze To Suspected Enemies")
+                .WithText($"Apply <{{a}}><keyword=haze> to <keyword={wtg.GUID}.suspected> enemies")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.eventPriority = -999;
+                    data.effectToApply = TryGet<StatusEffectHaze>("Haze");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Enemies;
+                    data.applyConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet<TraitData>($"{wtg.GUID}.Suspected");
+                        })
                     };
                 })
                 );

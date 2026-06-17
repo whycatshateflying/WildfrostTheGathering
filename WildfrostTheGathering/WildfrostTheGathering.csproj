@@ -438,6 +438,9 @@
     <Reference Include="UnityEngine.XRModule">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Wildfrost\Modded\Wildfrost_Data\Managed\UnityEngine.XRModule.dll</HintPath>
     </Reference>
+    <Reference Include="WildfrostBVWNModNewLocation">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\workshop\content\1811990\3669740838\WildfrostBVWNModNewLocation.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DragonDeck\Clunkers.cs" />
@@ -445,6 +448,7 @@
     <Compile Include="DragonDeck\Items.cs" />
     <Compile Include="DragonDeck\Leaders.cs" />
     <Compile Include="Effects.cs" />
+    <Compile Include="FrostEyeMakerExtensions.cs" />
     <Compile Include="Generic\Leaders.cs" />
     <Compile Include="Keywords.cs" />
     <Compile Include="Traits.cs" />

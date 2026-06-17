@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using FrostEyeMakerExtensions;
 
 namespace WildfrostTheGathering.DragonDeck
 {
@@ -59,6 +60,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>\"You see, most places have mice or mosquitoes...\"</i>")
                 .WithValue(45)
+                .AddEye(0.23f, 1.04f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -83,6 +85,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>You can never have enough gold</i>")
                 .WithValue(45)
+                .AddEye(0.45f, 1.37f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -105,6 +108,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("\"<i>The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b></i>")
                 .WithValue(45)
+                .AddEye(-0.57f, 1.01f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -152,6 +156,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>The tastiest morsels rarely make it to their intended destination</i>")
                 .WithValue(45)
+                .AddEye(-0.24f, 0.46f, 0.5f, 0.5f).AddEye(-0.07f, 0.47f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -193,6 +198,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("\"I believe in love at first shine\"")
                 .WithValue(45)
+                .AddEye(0.46f, 1.23f, 0.5f, 0.5f).AddEye(0.62f, 1.23f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -216,6 +222,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>Automated systems at the <b>Tolarian Academy</b> sort new acquisitions for optimal use, determining which should be studied, eaten, or sold</i>")
                 .WithValue(45)
+                .AddEye(0.02f, 1.32f, .5f, .5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -239,6 +246,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>What the initiates face in the final trial is completely at <b>Hazoret's</b> discretion</i>")
                 .WithValue(45)
+                .AddEye(0.47f, 0.98f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>()
@@ -286,6 +294,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>\"Human enlightenment is a firefly that sparks in the night. Dragon enlightenment is a beacon that disperses all darkness.\"</i>")
                 .WithValue(45)
+                .AddEye(-0.03f, 0.89f, 0.5f, 0.5f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>()
@@ -353,6 +362,7 @@ namespace WildfrostTheGathering.DragonDeck
                 .WithCardType("Friendly")
                 .WithFlavour("<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic<i>")
                 .WithValue(45)
+                .AddEye(0.57f, 0.98f, 0.25f, 0.25f)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]

@@ -308,7 +308,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.attackEffects = new CardData.StatusEffectStacks[]
                     {
                             wtg.SStack("Instant Gain Ongoing While Active Allies Gain Spark", 1),
-                            wtg.SStack("Spice", 1)
+                            wtg.SStack("Increase Attack", 1)
                     };
                     data.canPlayOnHand = true;
                     data.targetConstraints = new TargetConstraint[]
