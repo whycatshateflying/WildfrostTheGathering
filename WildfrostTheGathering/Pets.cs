@@ -43,6 +43,7 @@ namespace WildfrostTheGathering
                     data.traits = new List<CardData.TraitStacks>
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                 })
                 );

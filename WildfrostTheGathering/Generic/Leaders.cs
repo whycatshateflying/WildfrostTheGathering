@@ -92,11 +92,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Valgavoth, Harrower of Souls (no art!)
+            // Valgavoth, Harrower of Souls
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("valgavothHarrowerOfSoulsLeader", "Valgavoth, Harrower of Souls", idleAnim: "FloatAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("valgavoth-harrower-of-souls-ccold.png", "companion-bg.png")
             .SetStats(7, 1, 6)  // 7-8, 1-2, 6-7
             .WithFlavour("Bound to a single house, <b>Valgavoth</b> simply expanded its boundaries until it consumed the plane, turning a vibrant world into his playground of terror")
             .WithValue(25)
@@ -104,7 +104,8 @@ namespace WildfrostTheGathering.Generic
             {
                 data.traits = new List<CardData.TraitStacks>
                 {
-                    wtg.TStack("Flying"),
+                    wtg.TStack("Flying", 1),
+                    wtg.TStack("CountsAsFlying", 1),
                 };
                 data.startWithEffects = new CardData.StatusEffectStacks[]
                 {
@@ -121,11 +122,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Yargle and Multani (no art!)
+            // Yargle and Multani
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("yargleAndMultaniLeader", "Yargle and Multani", idleAnim: "PulseAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("yargle-and-multani-smaniak.png", "companion-bg.png")
             .SetStats(5, 12, 5)  // 5-6, 11-14, 5
             .WithFlavour("\"I\'ve heard much about you from my daughter,\" <b>Multani</b> rumbled. \"There was a time when I\'d balk at your aid, phantom, but she has shown me the merit in <b>Urborg\'s</b> strange ways.\"\n\"Gnshhagghkkapphribbit,\" replied <b>Yargle</b>")
             .WithValue(25)
@@ -141,11 +142,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Obeka Leader (no art!) (flavor!)
+            // Obeka Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("obekaBruteChronologistLeader", "Obeka, Brute Chronologist", idleAnim: "SwayAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("obeka-brute-chronologist-jejsing.png", "companion-bg.png")
             .SetStats(10, 4, 4)  // 9-11, 3-5, 4
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -167,11 +168,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
             
-            // Zozu Leader (no art!) (flavor!)
+            // Zozu Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
-            .CreateUnit("zozuThePunisherLeader", "Zozu the Punisher", idleAnim: "SwayAnimationProfile")
+            .CreateUnit("zozuThePunisherLeader", "Zo-Zu the Punisher", idleAnim: "SwayAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("zo-zu-the-punisher-mcavotta.png", "companion-bg.png")
             .SetStats(10, 2, 2)  // 10-11, 2-3, 2
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -191,10 +192,10 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Minnllusion Token (no art!) (flavor!)
+            // Minnllusion Token (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("minnllusionToken", "Illusion Token", idleAnim: "FloatSquishAnimationProfile")
-                .SetSprites("dragon-baby.png", "companion-bg.png")
+                .SetSprites("minnlusion-igort.png", "companion-bg.png")
                 .SetStats(2, 0, 3)
                 .WithCardType("Summoned")
                 .WithValue(25)
@@ -208,11 +209,11 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Minn Leader (no art!) (flavor!)
+            // Minn Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("minnWilyIllusionist", "Minn, Wily Illusionist", idleAnim: "SwayAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("minn-wily-illusionist-dburmak.png", "companion-bg.png")
             .SetStats(5, 2, 3)  // 5-6, 2-3, 3
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -232,11 +233,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Rankle Leader (no art!) (flavor!) (ugly!)
+            // Rankle Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("rankleMasterOfPranks", "Rankle, Master of Pranks", idleAnim: "ShakeAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("rankle-master-of-pranks-dburmak.png", "companion-bg.png")
             .SetStats(7, 3, 3)  // 7-8, 3, 3
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -246,6 +247,7 @@ namespace WildfrostTheGathering.Generic
                 {
                     wtg.SStack("After Turn Randomly Gain Ongoing Flying Or Ongoing Barrage", 1),
                     wtg.SStack("Ongoing Flying", 1),
+                    wtg.SStack("Ongoing Counts As Flying", 1),
                 };
                 data.greetMessages = new string[] { "Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>" };
                 data.createScripts = new CardScript[]
@@ -256,11 +258,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Clue Token (no art!) (flavor!)
+            // Clue Token (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("clueToken", "Clue Token", idleAnim: "FloatAnimationProfile")
                 .WithCardType("Clunker")
-                .SetSprites("placeholder-item.png", "companion-bg.png")
+                .SetSprites("clue-dwilkerson.png", "companion-bg.png")
                 .SetStats(null, null, 0)
                 .WithValue(25)
                 .SubscribeToAfterAllBuildEvent(data =>
@@ -274,11 +276,11 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Alquist Proft Leader (no art!) (flavor!)
+            // Alquist Proft Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
             .CreateUnit("alquistProftMasterSleuthLeader", "Alquist Proft, Master Sleuth", idleAnim: "SwayAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("alquist-proft-master-slueth-azafiratos.png", "companion-bg.png")
             .SetStats(6, 2, 5)  // 5-7, 2-3, 5
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -299,11 +301,11 @@ namespace WildfrostTheGathering.Generic
             })
             );
 
-            // Nelly Borca Leader (no art!) (flavor!)
+            // Nelly Borca Leader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
-            .CreateUnit("nellyBorcaImpulsiveAccuser", "Nelly Borca, Impulsive Accuser", idleAnim: "SwayAnimationProfile")
+            .CreateUnit("nellyBorcaImpulsiveAccuserLeader", "Nelly Borca, Impulsive Accuser", idleAnim: "SwayAnimationProfile")
             .WithCardType("Leader")
-            .SetSprites("placeholder-companion.png", "companion-bg.png")
+            .SetSprites("nelly-borca-impulsiver-accuser-jryman.png", "companion-bg.png")
             .SetStats(5, 1, 4)  // 5-6, 1-2, 4
             .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
             .WithValue(25)
@@ -319,6 +321,100 @@ namespace WildfrostTheGathering.Generic
                 {
                     GiveUpgrade(),
                     AddRandomHealth(0,1),
+                    AddRandomDamage(0,1),
+                };
+            })
+            );
+
+            // Winter Leader (flavor!)
+            assets.Add(new CardDataBuilder(wtg)
+            .CreateUnit("winterMisanthropicGuideLeader", "Winter, Misanthropic Guide", idleAnim: "SwayAnimationProfile")
+            .WithCardType("Leader")
+            .SetSprites("winter-misanthropic-guide-jmuir.png", "companion-bg.png")
+            .SetStats(6, 3, 4)  // 6-7, 2-4, 4-5
+            .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
+            .WithValue(25)
+            .SubscribeToAfterAllBuildEvent(data =>
+            {
+                data.startWithEffects = new CardData.StatusEffectStacks[]
+                {
+                    wtg.SStack("When Third Card Type Destroyed Gain While Active Apply Dont Count Down If In Third Row To All Enemies", 1),
+                };
+                data.greetMessages = new string[] { "Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>" };
+                data.createScripts = new CardScript[]
+                {
+                    GiveUpgrade(),
+                    AddRandomHealth(0,1),
+                    AddRandomDamage(-1,1),
+                    AddRandomCounter(0,1),
+                };
+            })
+            );
+
+            // Toggo Rock
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateItem("toggoRock", "Rock", idleAnim: "FloatAnimationProfile")
+                .SetSprites("toggo-rock-tjedruszek.png", "item-bg.png")
+                .SetDamage(2)
+                .WithCardType("Item")
+                .WithFlavour("<i>*rock noises*</i>")
+                .WithValue(35)  // Base price in shop: +-6
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.traits = new List<CardData.TraitStacks>(2)
+                    {
+                            wtg.TStack("Consume", 1),
+                            wtg.TStack("Zoomlin", 1),
+                    };
+                    data.uses = 1;
+                })
+                );
+
+            // Toggo Leader (flavor!)
+            assets.Add(new CardDataBuilder(wtg)
+            .CreateUnit("toggoGoblinWeaponsmithLeader", "Toggo, Goblin Weaponsmith", idleAnim: "SwayAnimationProfile")
+            .WithCardType("Leader")
+            .SetSprites("toggo-goblin-weaponsmith-svelinov.png", "companion-bg.png")
+            .SetStats(7, 1, 4)  // 7-8, 1-2, 4
+            .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
+            .WithValue(25)
+            .SubscribeToAfterAllBuildEvent(data =>
+            {
+                data.startWithEffects = new CardData.StatusEffectStacks[]
+                {
+                    wtg.SStack("On Card Played Add Rock To Hand", 1),
+                    wtg.SStack("Trigger When Not Rock With Zoomlin Hits", 1)
+                };
+                data.greetMessages = new string[] { "Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>" };
+                data.createScripts = new CardScript[]
+                {
+                    GiveUpgrade(),
+                    AddRandomHealth(0,1),
+                    AddRandomDamage(0,1),
+                };
+            })
+            );
+
+            // Ms. Bumbleflower leader (flavor!)
+            assets.Add(new CardDataBuilder(wtg)
+            .CreateUnit("msBumbleflowerLeader", "Ms. Bumbleflower", idleAnim: "SwayAnimationProfile")
+            .WithCardType("Leader")
+            .SetSprites("ms-bumbleflower-mnael.png", "companion-bg.png")
+            .SetStats(13, 1, 4)  // 7-8, 1-2, 4
+            .WithFlavour("Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>")
+            .WithValue(25)
+            .SubscribeToAfterAllBuildEvent(data =>
+            {
+                data.startWithEffects = new CardData.StatusEffectStacks[]
+                {
+                    wtg.SStack("Add Attack To Random Enemy When Item Hits", 1),
+                    wtg.SStack("Add Attack And Ongoing Flying To Ally Behind When Second Item Hits", 2)
+                };
+                data.greetMessages = new string[] { "Trained by the <b>Imperials</b> but disillusioned by their rigidity, he gave his heart-and his swords-to the <b>Asari Uprising</b>" };
+                data.createScripts = new CardScript[]
+                {
+                    GiveUpgrade(),
+                    AddRandomHealth(-1,1),
                     AddRandomDamage(0,1),
                 };
             })

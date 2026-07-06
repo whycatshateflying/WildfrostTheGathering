@@ -1,11 +1,7 @@
 ﻿using DeadExtensions;
 using Deadpan.Enums.Engine.Components.Modding;
 using HarmonyLib;
-using JetBrains.Annotations;
-using Rewired;
-using Steamworks.ServerList;
 using System;
-using System.CodeDom;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
@@ -15,7 +11,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Localization;
 using UnityEngine.SceneManagement;
-using static Steamworks.InventoryItem;
 
 namespace WildfrostTheGathering
 {
@@ -492,8 +487,179 @@ namespace WildfrostTheGathering
             }
         }
 
+        // Cause while active ally behind is broken otherwise. Thanks While Active
+        public class StatusEffectWhileActiveXUpdatesOnOtherMove : StatusEffectWhileActiveX
+        {
+            public override void Init()
+            {
+                base.Init();
+            }
+            public override void OnDestroy()
+            {
+                base.OnDestroy();
+            }
+
+            public override IEnumerator CardMove(Entity entity)
+            {
+                // Literally just the old code but add a call to FindContainers
+                if (target == entity)
+                {
+                    Debug.Log("[WTG] Case A");
+                    yield return base.CardMove(entity);  // For code tidiness
+                }
+                else
+                {
+                    if (!active)
+                    {
+                        yield break;
+                    }
+
+                    if (AffectsSlot())
+                    {
+                        FindContainersClone();
+                        CardContainer[] other = containersToAffect.Select((CardContainer a) => a.Group).ToArray();
+                        if (entity.containers.ContainsAny(other) || entity.preContainers.ContainsAny(other))
+                        {
+                            Debug.Log("[WTG] Case B");
+                            yield return Deactivate();
+                            yield return Activate();
+                        }
+                    }
+                    else if (affected.Contains(entity))
+                    {
+                        if (!containersToAffect.ContainsAny(entity.containers))
+                        {
+                            Debug.Log("[WTG] Case C");
+                            yield return UnAffect(entity);
+                        }
+                    }
+                    else if (containersToAffect.ContainsAny(entity.containers))
+                    {
+                        Debug.Log("[WTG] Case D");
+                        yield return Affect(entity);
+                    }
+                }
+
+            }
+
+            public void FindContainersClone()
+            {
+                // containersToAffect.Clear();  // This breaks it for some reason... Other than that, no changes
+                Character opponent = Battle.GetOpponent(target.owner);
+                int[] rowIndices = Battle.instance.GetRowIndices(target);
+                affectsSelf = AppliesTo(ApplyToFlags.Self);
+                if (AppliesTo(ApplyToFlags.Allies))
+                {
+                    containersToAffect.AddRange(Battle.instance.GetRows(target.owner));
+                }
+                else if (AppliesTo(ApplyToFlags.AlliesInRow))
+                {
+                    int[] array = rowIndices;
+                    foreach (int rowIndex in array)
+                    {
+                        containersToAffect.Add(Battle.instance.GetRow(target.owner, rowIndex));
+                    }
+                }
+                else
+                {
+                    if (AppliesTo(ApplyToFlags.FrontAlly))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex2 in array)
+                        {
+                            if (Battle.instance.GetRow(target.owner, rowIndex2) is CardSlotLane cardSlotLane)
+                            {
+                                CardSlot value = cardSlotLane.slots.FirstOrDefault((CardSlot a) => !a.Empty);
+                                containersToAffect.AddIfNotNull(value);
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.BackAlly))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex3 in array)
+                        {
+                            if (Battle.instance.GetRow(target.owner, rowIndex3) is CardSlotLane cardSlotLane2)
+                            {
+                                CardSlot value2 = cardSlotLane2.slots.LastOrDefault((CardSlot a) => !a.Empty);
+                                containersToAffect.AddIfNotNull(value2);
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.AllyInFrontOf))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex4 in array)
+                        {
+                            if (!(Battle.instance.GetRow(target.owner, rowIndex4) is CardSlotLane cardSlotLane3))
+                            {
+                                continue;
+                            }
+
+                            for (int num = cardSlotLane3.IndexOf(target) - 1; num >= 0; num--)
+                            {
+                                CardSlot cardSlot = cardSlotLane3.slots[num];
+                                if (!cardSlot.Empty)
+                                {
+                                    containersToAffect.Add(cardSlot);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (AppliesTo(ApplyToFlags.AllyBehind))
+                    {
+                        int[] array = rowIndices;
+                        foreach (int rowIndex5 in array)
+                        {
+                            if (!(Battle.instance.GetRow(target.owner, rowIndex5) is CardSlotLane cardSlotLane4))
+                            {
+                                continue;
+                            }
+
+                            for (int num2 = cardSlotLane4.IndexOf(target) + 1; num2 < cardSlotLane4.slots.Count; num2++)
+                            {
+                                CardSlot cardSlot2 = cardSlotLane4.slots[num2];
+                                if (!cardSlot2.Empty)
+                                {
+                                    containersToAffect.Add(cardSlot2);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (AppliesTo(ApplyToFlags.Enemies))
+                {
+                    containersToAffect.AddRange(Battle.instance.GetRows(opponent));
+                }
+                else if (AppliesTo(ApplyToFlags.EnemiesInRow))
+                {
+                    int[] array = rowIndices;
+                    foreach (int rowIndex6 in array)
+                    {
+                        containersToAffect.Add(Battle.instance.GetRow(opponent, rowIndex6));
+                    }
+                }
+
+                if (AppliesTo(ApplyToFlags.Hand) && (bool)References.Player)
+                {
+                    containersToAffect.AddIfNotNull(References.Player.handContainer);
+                }
+
+                if (AppliesTo(ApplyToFlags.EnemyHand) && (bool)opponent)
+                {
+                    containersToAffect.AddIfNotNull(opponent.handContainer);
+                }
+            }
+        }
+
         // Status Effect Trait Once = Ongoing - <trait>
-        public class StatusEffectTemporaryTraitOnce: StatusEffectTemporaryTrait
+        public class StatusEffectTemporaryTraitOnce: StatusEffectSafeTemporaryTrait
         {
             public bool cardPlayed;
             public override void Init()
@@ -1337,7 +1503,133 @@ namespace WildfrostTheGathering
                 yield return Run(GetTargets(), GetAmount());
             }
         }
-        
+
+        // Track the number of cards destroyed total ever
+        public class StatusEffectApplyXWhenDeployedEqualToCardsDestroyedEver : StatusEffectApplyXWhenDeployed
+        {
+            public int numDestroyedThisBattle = 0;
+            public bool clearWhenRecalled = false;
+            public Func<Entity, Entity, DeathType, bool> pred = null;  // target, dead, deathtype
+            public override void Init()
+            {
+                base.OnEnable += ActivateNew;
+                base.OnCardMove += ActivateNew;
+                Events.OnDiscard += ClearOnRecall;
+            }
+            public void OnDestroy()
+            {
+                Events.OnDiscard -= ClearOnRecall;
+            }
+            public override bool RunEntityDestroyedEvent(Entity entity, DeathType deathType)
+            {
+                Debug.Log("[WTG] Something died!");
+                Func<Entity, Entity, DeathType, bool> predicate = TryGet<StatusEffectApplyXWhenDeployedEqualToCardsDestroyedEver>(name).pred;
+
+                if (predicate is null)
+                {
+                    Debug.LogWarning("Oh yeah btw that predicate was null. I'm assuming that was intentional but if it wasn't you should really check that out. Maybe make sure you code correctly next time");
+                    Debug.Log("[WTG] Oh yeah it died I'm writing that down mhm " + numDestroyedThisBattle);
+                    numDestroyedThisBattle++;
+                }
+                else
+                {
+                    if (predicate(target, entity, deathType))
+                    {
+                        Debug.Log("[WTG] Oh yeah it died I'm writing that down mhm " + numDestroyedThisBattle);
+                        numDestroyedThisBattle++;
+                    }
+                }
+                return false;
+            }
+
+            public IEnumerator ActivateNew(Entity entity)
+            {
+                Debug.Log("[WTG] Now applying " + numDestroyedThisBattle + " and GetAmount is " + GetAmount());
+                yield return Run(GetTargets(hackyHit), numDestroyedThisBattle * GetAmount());
+            }
+            private void ClearOnRecall(Entity discarded)
+            {
+                if (discarded != target || !clearWhenRecalled)
+                {
+                    return;
+                }
+                numDestroyedThisBattle = 0;
+            }
+
+            public override object GetMidBattleData()
+            {
+                return numDestroyedThisBattle;
+            }
+            public override void RestoreMidBattleData(object data)
+            {
+                if (data is int ndtb)
+                    numDestroyedThisBattle = ndtb;
+            }
+        }
+        public class StatusEffectApplyXIfAllCardTypesDestroyed : StatusEffectApplyX
+        {
+            public HashSet<CardType> typesDestroyed = [];
+            public string[] typesWanted = [];
+            public bool once = false;
+            public Func<Entity, Entity, DeathType, bool> pred = null;  // target, dead, deathtype
+            public override void Init()
+            {
+                base.OnEntityDestroyed += ApplyTheEffect;
+            }
+
+            private IEnumerator ApplyTheEffect(Entity entity, DeathType deathType)
+            {
+                Debug.Log("[WTG] Shablamo! Doin' the thing!");
+                List <Entity> targets = GetTargets();
+                yield return Run(targets, GetAmount());
+                foreach (Entity target in targets)
+                {
+                    target.display.promptUpdateDescription = true;
+                    target.PromptUpdate();
+                }
+                if (once)
+                {
+                    Debug.Log("[WTG] Aight cya");
+                    yield return Remove();
+                }
+            }
+
+            public override bool RunEntityDestroyedEvent(Entity entity, DeathType deathType)
+            {
+                Debug.Log("[WTG] Something died!");
+                Func<Entity, Entity, DeathType, bool> predicate = TryGet<StatusEffectApplyXIfAllCardTypesDestroyed>(name).pred;
+
+                if (predicate is null)
+                    Debug.LogWarning("Oh yeah btw that predicate was null. I'm assuming that was intentional but if it wasn't you should really check that out. Maybe make sure you code correctly next time");
+
+                else if (!predicate(target, entity, deathType))
+                    return false;
+
+                typesDestroyed.Add(entity.data.cardType);
+                foreach (string type in typesWanted)
+                {
+                    Debug.Log("[WTG] Checking if " + type + " was killed...");
+                    if (!typesDestroyed.Any(t => t.name == type || (type == "Friendly" && t.name == "Leader")))
+                    {
+                        Debug.Log("[WTG] " + type + " wasn't killed!");
+                        return false;
+                    }
+                    Debug.Log("[WTG] " + type + " was killed!");
+                }
+                return true;
+            }
+
+            public override object GetMidBattleData()
+            {
+                return typesDestroyed;
+            }
+            public override void RestoreMidBattleData(object data)
+            {
+                if (data is HashSet<CardType> td)
+                    typesDestroyed = td;
+            }
+        }
+
         // Thank you again Abigail for the very yoinkable code! :3 And thank you semmie+Abigail for debugging said code when it broke on its own!
         public class ScriptableTargetsOnBoard : ScriptableAmount
         {
@@ -1510,7 +1802,7 @@ namespace WildfrostTheGathering
                 Events.OnEntityCountDown += DontCountDown;
             }
 
-            private void DontCountDown(Entity entity, ref int amount)
+            public virtual void DontCountDown(Entity entity, ref int amount)
             {
                 // Debug.Log("[WTG] Someone counted down! " + entity.name);
                 if (entity == target)
@@ -1532,6 +1824,40 @@ namespace WildfrostTheGathering
             public void OnDestroy()
             {
                 Events.OnEntityCountDown -= DontCountDown;
+            }
+        }
+        public class StatusEffectOnlyCountDownWhenPredicateUpdateDesc : StatusEffectOnlyCountDownWhenPredicate
+        {
+            public override bool RunStackEvent(int stacks)
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return base.RunStackEvent(stacks);
+            }
+            public override void DontCountDown(Entity entity, ref int amount)
+            {
+                // Debug.Log("[WTG] Someone counted down! " + entity.name);
+                if (entity == target)
+                {
+                    Debug.Log("[WTG] I (" + target.name + ") counted down! Checking the predicate");
+
+                    var predicate = TryGet<StatusEffectOnlyCountDownWhenPredicateUpdateDesc>(name).pred;
+
+                    if (predicate is null)
+                        throw new ArgumentException("No predicate found");
+
+                    if (!predicate.Invoke(target))
+                    {
+                        Debug.Log("[WTG] Predicate did not pass :( Setting amount to 0");
+                        amount = 0;
+                    }
+                }
+            }
+            public override bool RunEndEvent()
+            {
+                target.display.promptUpdateDescription = true;
+                target.PromptUpdate();
+                return base.RunEndEvent();
             }
         }
 
@@ -1589,8 +1915,22 @@ namespace WildfrostTheGathering
             public override void Init()
             {
                 base.OnEntityDestroyed += Check;
+                GoUpdateEqDragonText += UpdateMe;
                 base.Init();
             }
+
+            public override void OnDestroy()
+            {
+                GoUpdateEqDragonText -= UpdateMe;
+                base.OnDestroy();
+            }
+
+            private void UpdateMe()
+            {
+                ActionQueue.Add(new ActionSequence(Deactivate()));
+                ActionQueue.Add(new ActionSequence(Activate()));
+            }
+
             public override IEnumerator CardMove(Entity entity)
             {
                 if (target == entity)
@@ -2423,7 +2763,7 @@ namespace WildfrostTheGathering
         // Stolen from BVWN. Thank you PK!
         public class StatusEffectApplyXAfterTurn : StatusEffectApplyX
         {
-            public List<StatusEffectData> effects = [];  // Use default effectToApply if empty. Otherwise choose RANDOMLY
+            public List<StatusEffectData[]> effects = [];  // Use default effectToApply if empty. Otherwise choose RANDOMLY
             public override void Init()
             {
                 base.OnCardPlayed += CheckCardPlay;
@@ -2438,17 +2778,52 @@ namespace WildfrostTheGathering
 
                 return !ActionQueue.GetActions().Any((PlayAction a) => a is ActionTrigger actionTrigger && actionTrigger.entity == entity);
             }
+
             private static IOrderedEnumerable<T> InPettyRandomOrder<T>(IEnumerable<T> source)
             {
                 return source.OrderBy(_ => Dead.PettyRandom.Range(0f, 1f));
             }
+
             private IEnumerator CheckCardPlay(Entity entity, Entity[] targets)
             {
-                if (effects.Count > 0)
+                effects = TryGet<StatusEffectApplyXAfterTurn>(name).effects;
+
+                if (effects.Count == 0)
                 {
-                    effectToApply = InPettyRandomOrder(effects).ToList()[0];
+                    Debug.Log("[WTG] " + target.data.title + " had no effect! fallback effect " + effectToApply.name);
+                    yield return Run(GetTargets());
+                    yield break;
                 }
-                return Run(GetTargets());
+                List<StatusEffectData[]> listedEffects = InPettyRandomOrder<StatusEffectData[]>(effects).ToList();
+                foreach (StatusEffectData effect in listedEffects[0])
+                {
+                    effectToApply = effect;
+                    Debug.Log("[WTG] " + target.data.title + " is applying " + effect.name);
+                    yield return Run(GetTargets());
+                }
+                InvokeGoUpdateEqDragonText();
+            }
+        }
+
+        public class StatusEffectApplyXWhenHitAttackerPredicate : StatusEffectApplyXWhenHit
+        {
+            public Func<Entity, Entity, bool> pred = null;  // Target, attacker
+            public override bool RunPostHitEvent(Hit hit)
+            {
+                if (target.enabled && hit.target == target && hit.canRetaliate && (!targetMustBeAlive || (target.alive && Battle.IsOnBoard(target))) && hit.Offensive && hit.BasicHit)
+                {
+                    return CheckAttackerPredicate(hit.attacker);
+                }
+
+                return false;
+            }
+            public bool CheckAttackerPredicate(Entity attacker)
+            {
+                var predicate = TryGet<StatusEffectApplyXWhenHitAttackerPredicate>(name).pred;
+                if (predicate is null)
+                    throw new ArgumentException("predicate (actually a function lmao) was null!");
+
+                return predicate(target, attacker);
             }
         }
 
@@ -2570,16 +2945,32 @@ namespace WildfrostTheGathering
                 yield return Remove();
             }
         }
+        // For clean WhileActiveX to update on move
+        public static event UnityAction OnShoveEnd;
+        public static void InvokeOnShoveEnd()
+        {
+            Debug.Log("[WTG] On shove end Invoked!");
+            OnShoveEnd?.Invoke();
+        }
 
+        // Rankle adding an event for eq dragon to update
+        public static event UnityAction GoUpdateEqDragonText;
+        public static void InvokeGoUpdateEqDragonText()
+        {
+            Debug.Log("[WTG] YOU! Any EQ Dragons??? UPDATE!");
+            GoUpdateEqDragonText?.Invoke();
+        }
+
+        // TODO: Rankle should give flying draw 1
         // TODO: Maddening Cacophony resets when exit and return
+        // TODO: Make Tarmogoyf be nice and not a hidden when deployed effect
         // TODO: Conspiracy doesn't make crown on shade sculptor duplicates
         // TODO: Organize and comment Trample code (bleh)
         // TODO: Balance Manaform Hellkite
         // TODO: Manaform hellkite when in hand
         // TODO: Make Delayed Blast Fireball not clear all spice after played
         // TODO: Make beatable ascendeds
-        // TODO: Rankle text look ugly 🥺
-        // TODO: Rankle effect flickering 🥺
+        // TODO: CountsAsFlying shows an empty , , when snother trait is added. This probably needs a harmony patch
         // TODO: Make peppernut charm work for custom effects
         // TODO: Make charms that care about target mode recognize the custom ones (gnome, pom so far)
         // TODO: make zoomlin sound not play twice for treasures added to hand (if possible)
@@ -2623,7 +3014,11 @@ namespace WildfrostTheGathering
                                                         "powerPlay", "damnablePact", "assassinate", "advantageousProclamation",
                                                         "doomsday", "throesOfChaos"};
 
-                string[] genericLeaders = new string[] { "helgaSkittishSeerLeader", "omnathLocusOfCreationLeader", "isshinTwoHeavensAsOne" };
+                string[] genericLeaders = new string[] { "helgaSkittishSeerLeader", "omnathLocusOfCreationLeader", "isshinTwoHeavensAsOne",
+                                                         "valgavothHarrowerOfSoulsLeader", "yargleAndMultaniLeader", "obekaBruteChronologistLeader",
+                                                         "zozuThePunisherLeader", "minnWilyIllusionist", "rankleMasterOfPranks", 
+                                                         "alquistProftMasterSleuthLeader", "nellyBorcaImpulsiveAccuserLeader", "winterMisanthropicGuideLeader",
+                                                         "toggoGoblinWeaponsmithLeader", "msBumbleflowerLeader" };
 
                 string[] genericCompanions = new string[] { "fearOfSleepParalysis", "mulldrifter", "nulldrifter", "deadeyeNavigator",
                                                             "beastWhisperer", "warrenSoultrader", "laboratoryManiac", "springheartNantuko",

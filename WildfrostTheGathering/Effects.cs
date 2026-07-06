@@ -256,7 +256,7 @@ namespace WildfrostTheGathering
             // Annie Joins Up: Add Ongoing Frenzy to front ally
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnHit>("On Hit Gain Ongoing Frenzy To Front Ally")
-                .WithText("Add \"{0} - <x{a}><keyword=frenzy>\" to frontmost ally")
+                .WithText("Add \"{0} <- ><x{a}><keyword=frenzy>\" to frontmost ally")
                 .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
@@ -273,7 +273,7 @@ namespace WildfrostTheGathering
             // Ongoing Frenzy
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectWhileActiveXOnce>("Ongoing Frenzy")
-                .WithText("{0} - <x{a}><keyword=frenzy>")
+                .WithText("{0} <- > <x{a}><keyword=frenzy>")
                 .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
@@ -555,9 +555,6 @@ namespace WildfrostTheGathering
                 .Create<StatusEffectChangeTargetMode>("Prioritize Bosses")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
-                .WithOffensive(false)  // As an attack effect, this is treated as a buff
-                .WithMakesOffensive(false)  // As a starting effect, its entity should target allies
-                .WithDoesDamage(false)  // Its entity cannot kill with this effect, eg for Bling Charm
                 .SubscribeToAfterAllBuildEvent<StatusEffectChangeTargetMode>(data =>
                 {
                     data.targetMode = new Scriptable<TargetModePrioritizeBosses>();
@@ -600,11 +597,11 @@ namespace WildfrostTheGathering
                     data.effectToApply = TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter");
                     data.applyConstraints = new TargetConstraint[]
                     {
-                    new Scriptable<TargetConstraintHasTrait>(tcht =>
-                    {
-                        tcht.trait = TryGet<TraitData>("Flying");
-                        tcht.ignoreSilenced = false;
-                    }),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet<TraitData>("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
                     };
                     data.applyEqualAmount = true;  // NOPE too annoying cause overflow. Also if you end up fixing this, add <a> to the thingy instead of 1. oh hey test overflow again I think I solved it
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
@@ -628,7 +625,7 @@ namespace WildfrostTheGathering
                     data.whenAllyDeployed = true;
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying");
                     });
                 })
                 );
@@ -733,11 +730,11 @@ namespace WildfrostTheGathering
                 {
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying");
                     });
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
-                    scriptAmount.hasTrait = TryGet<TraitData>("Flying");
+                    scriptAmount.hasTrait = TryGet<TraitData>("CountsAsFlying");
                     data.scriptableAmount = scriptAmount;
                     data.applyEqualAmount = true;
                     data.effectToApply = TryGet<StatusEffectOngoingCounter>("Ongoing Decrease Counter Stackable");
@@ -757,7 +754,7 @@ namespace WildfrostTheGathering
                 {
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying"))
                         {
                             Debug.Log("[WTG] The card did not have Flying...");
                             return false;
@@ -1056,7 +1053,7 @@ namespace WildfrostTheGathering
                             new Scriptable<TargetConstraintIsFeatureOnBoard>(tcifob =>
                             {
                                 tcifob.allies = true;
-                                tcifob.hasTrait = TryGet < TraitData >("Flying");
+                                tcifob.hasTrait = TryGet <TraitData>("CountsAsFlying");
                                 tcifob.requiredAmount = 2;
                             }),
                     };
@@ -1081,7 +1078,7 @@ namespace WildfrostTheGathering
                             new Scriptable<TargetConstraintIsFeatureOnBoard>(tcifob =>
                             {
                                 tcifob.allies = true;
-                                tcifob.hasTrait = TryGet < TraitData >("Flying");
+                                tcifob.hasTrait = TryGet <TraitData>("CountsAsFlying");
                                 tcifob.requiredAmount = 2;
                             }),
                     };
@@ -1135,15 +1132,15 @@ namespace WildfrostTheGathering
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintHasTrait>(tcht =>
-                            {
-                                tcht.trait = TryGet < TraitData >("Flying");
-                                tcht.ignoreSilenced = false;
-                            }),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet <TraitData>("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
                     };
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
-                    scriptAmount.hasTrait = TryGet<TraitData>("Flying");
+                    scriptAmount.hasTrait = TryGet<TraitData>("CountsAsFlying");
                     scriptAmount.mult = 2;
                     data.scriptableAmount = scriptAmount;
                     data.applyEqualAmount = true;
@@ -1234,7 +1231,7 @@ namespace WildfrostTheGathering
             // Fires of Yavimaya: instant gain Ongoing - While Active allies gain Spark
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXInstant>("Instant Gain Ongoing While Active Allies Gain Spark")
-                .WithText("Add \"{0} - While Active, allies gain <keyword=spark>\" to the target")
+                .WithText("Add \"{0} <- > While Active, allies gain <keyword=spark>\" to the target")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
@@ -1248,7 +1245,7 @@ namespace WildfrostTheGathering
             // Fires of Yavimaya: Ongoing - While active allies gain Spark
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectWhileActiveXOnce>("Ongoing While Active Allies Gain Spark")
-                .WithText("{0} - While Active, allies gain <keyword=spark>")
+                .WithText("{0} <- > While Active, allies gain <keyword=spark>")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
@@ -1292,7 +1289,7 @@ namespace WildfrostTheGathering
             // Resourceful Defense: Instant gain Ongoing retain spice
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXInstant>("Instant Gain Ongoing Halt Spice")
-                .WithText("Add \"{0} - Retains <keyword=spice>\" to the target")
+                .WithText("Add \"{0} <- > Retains <keyword=spice>\" to the target")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
@@ -1306,7 +1303,7 @@ namespace WildfrostTheGathering
             // Resourceful Defense: Ongoing retain spice
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectHaltXOnce>("Ongoing Halt Spice")
-                .WithText("{0} - Retains <keyword=spice>")
+                .WithText("{0} <- > Retains <keyword=spice>")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
@@ -1424,12 +1421,12 @@ namespace WildfrostTheGathering
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintIsUnit>(),
-                            new Scriptable<TargetConstraintHasTrait>(tcht =>
-                            {
-                                tcht.trait = TryGet < TraitData >("Flying");
-                                tcht.ignoreSilenced = false;
-                            }),
+                        new Scriptable<TargetConstraintIsUnit>(),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet <TraitData>("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
                     };
                     data.targetMustBeAlive = false;
                 })
@@ -1459,18 +1456,18 @@ namespace WildfrostTheGathering
                 {
                     data.hiddenKeywords = new KeywordData[]
                     {
-                            TryGet < KeywordData >("Active"),
+                        TryGet < KeywordData >("Active"),
                     };
                     data.eventPriority = 10;
                     data.effectToApply = TryGet<StatusEffectOngoingAttack>("Ongoing Increase Attack");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies;
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintHasTrait>(tcht =>
-                            {
-                                tcht.trait = TryGet < TraitData >("Flying");
-                                tcht.ignoreSilenced = false;
-                            }),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet < TraitData >("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
                     };
                 })
                 );
@@ -1492,12 +1489,12 @@ namespace WildfrostTheGathering
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintHasTrait>(tcht =>
-                            {
-                                tcht.not = true;
-                                tcht.trait = TryGet < TraitData >("Flying");
-                                tcht.ignoreSilenced = false;
-                            }),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.not = true;
+                            tcht.trait = TryGet < TraitData >("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
                     };
                 })
                 );
@@ -1545,7 +1542,7 @@ namespace WildfrostTheGathering
             // Windcrag Siege: Add Ongoing Gain 1 frenzy to ally behind
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Ongoing Frenzy To AllyBehind")
-                .WithText("Add \"{0} - <x{a}><keyword=frenzy>\" to ally behind")
+                .WithText("Add \"{0} <- > <x{a}><keyword=frenzy>\" to ally behind")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
@@ -1570,12 +1567,12 @@ namespace WildfrostTheGathering
                     data.effectToApply = TryGet<StatusEffectApplyXWhenDrawn>("When Drawn Gain Zoomlin");
                     data.applyConstraints = new TargetConstraint[]
                     {
-                            new Scriptable<TargetConstraintHasTrait>(tcht =>
-                            {
-                                tcht.trait = TryGet < TraitData >("Flying");
-                                tcht.ignoreSilenced = false;
-                            }),
-                            new Scriptable<TargetConstraintIsUnit>(tciu =>
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet < TraitData >("CountsAsFlying");
+                            tcht.ignoreSilenced = false;
+                        }),
+                        new Scriptable<TargetConstraintIsUnit>(tciu =>
                             {
                                 tciu.mustBeMiniboss = false;
                             }),
@@ -1685,7 +1682,7 @@ namespace WildfrostTheGathering
                     data.whenAllyDeployed = true;
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying"))
                         {
                             return false;
                         }
@@ -1725,6 +1722,7 @@ namespace WildfrostTheGathering
                     data.traits = new List<CardData.TraitStacks>()
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "Woah a token in the companion pool? That\'s not supposed to happen" };
                 })
@@ -1758,7 +1756,7 @@ namespace WildfrostTheGathering
                 {
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying"))
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying"))
                         {
                             Debug.Log("[WTG] The card did not have Flying...");
                             return false;
@@ -1785,7 +1783,7 @@ namespace WildfrostTheGathering
                     data.whenAllyDeployed = true;
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.Flying");
+                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying");
                     });
                 })
                 );
@@ -1850,7 +1848,7 @@ namespace WildfrostTheGathering
                         new Scriptable<TargetConstraintOnBoard>(),
                         new Scriptable<TargetConstraintHasTrait>(tcht =>
                         {
-                            tcht.trait = TryGet<TraitData>("Flying");
+                            tcht.trait = TryGet<TraitData>("CountsAsFlying");
                             tcht.ignoreSilenced = false;
                         }),
                     };
@@ -2311,7 +2309,7 @@ namespace WildfrostTheGathering
             // Ongoing Trample
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectTrampleOnce>("Ongoing Trample")
-                .WithText($"{{0}} - <keyword={wtg.GUID}.trample>")
+                .WithText($"{{0}} <- > <keyword={wtg.GUID}.trample>")
                 .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
@@ -2327,7 +2325,7 @@ namespace WildfrostTheGathering
             // Add Ongoing Trample to Self And Allies
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXWhenDeployed>("When Deployed Add Ongoing Trample To Self And Allies")
-                .WithText($"When deployed, add \"{{0}} - <keyword={wtg.GUID}.trample>\" to self and allies\"")
+                .WithText($"When deployed, add \"{{0}} <- > <keyword={wtg.GUID}.trample>\" to self and allies\"")
                 .WithTextInsert($"<keyword={wtg.GUID}.ongoing>")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
@@ -2516,7 +2514,7 @@ namespace WildfrostTheGathering
             // Isshin: Add Ongoing Frenzy to row
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Ongoing Frenzy To AlliesInRow")
-                .WithText("Add \"{0} - <x{a}><keyword=frenzy>\" to allies in row")
+                .WithText("Add \"{0} <- > <x{a}><keyword=frenzy>\" to allies in row")
                 .WithTextInsert("<keyword=whycats.wildfrost.wildfrostthegathering.ongoing>")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
@@ -2562,6 +2560,7 @@ namespace WildfrostTheGathering
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
                 {
+                    data.eventPriority = 99999;
                     data.effectToApply = TryGet<StatusEffectNull>("Null");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Allies | StatusEffectApplyX.ApplyToFlags.Enemies;
                 })
@@ -2676,42 +2675,54 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Rankle: Ongoing Flying
+            // Ongoing Flying
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectTemporaryTraitOnce>("Ongoing Flying")
-                .WithText($"<keyword={wtg.GUID}.ongoing> -")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTraitOnce>(data =>
                 {
                     data.removeOnDiscard = false;
-                    data.trait = TryGet<TraitData>("Flying");
+                    data.trait = TryGet<TraitData>("OngoingFlying");
+                })
+                );
+
+            // Ongoing Counts As Flying
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectTemporaryTraitOnce>("Ongoing Counts As Flying")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTraitOnce>(data =>
+                {
+                    data.removeOnDiscard = false;
+                    data.trait = TryGet<TraitData>("CountsAsFlying");
                 })
                 );
 
             // Rankle: Ongoing Barrage
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectTemporaryTraitOnce>("Ongoing Barrage")
-                .WithText($"<keyword={wtg.GUID}.ongoing> -")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectTemporaryTraitOnce>(data =>
                 {
                     data.removeOnDiscard = false;
-                    data.trait = TryGet<TraitData>("Barrage");
+                    data.trait = TryGet<TraitData>("OngoingBarrage");
                 })
                 );
 
-            // Rankle: After turn, gain Ongoing barrage or flying, draw 1 randomly
+            // Rankle: After turn, gain Visual Ongoing barrage or flying, draw 1 randomly
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXAfterTurn>("After Turn Randomly Gain Ongoing Flying Or Ongoing Barrage")
-                .WithText($"After attacking, randomly gain \"<keyword={wtg.GUID}.ongoing> - <keyword={wtg.GUID}.flying>\" or \"<keyword={wtg.GUID}.ongoing> - <keyword=barrage>\"")
+                .WithText($"After attacking, randomly gain \"<keyword={wtg.GUID}.ongoingflying>\" or \"<keyword={wtg.GUID}.ongoingbarrage>\"")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXAfterTurn>(data =>
                 {
-                    data.effectToApply = TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying");
-                    data.effects = [TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying"), TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Barrage")];
+                    data.effectToApply = TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Barrage");
+                    data.effects = [
+                        [TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying"), TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Counts As Flying")],
+                        [TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Barrage")]];
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                     data.targetMustBeAlive = false;
                 })
@@ -2773,7 +2784,7 @@ namespace WildfrostTheGathering
             // Proft: when deployed summon clues
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXWhenDeployed>("When Deployed Summon Multiple ClueTokens")
-                .WithText($"When deployed, summon <{{a}}> <card={wtg.GUID}.clueToken><s>")
+                .WithText($"When deployed, summon <{{a}}> <card={wtg.GUID}.clueToken><s >")
                 .WithStackable(true)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployed>(data =>
@@ -2823,7 +2834,6 @@ namespace WildfrostTheGathering
                 {
                     data.eventPriority = 99999;
                     data.summonCard = TryGet<CardData>("clueToken");
-                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
@@ -2840,7 +2850,7 @@ namespace WildfrostTheGathering
             // Nelly Borca: Add Suspected and Ongoing Frenzy to random enemy
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add Suspected And Ongoing Frenzy To Random Enemy")
-                .WithText($"Add <keyword={wtg.GUID}.suspected> and \"<keyword={wtg.GUID}.ongoing> - <x{{a}}><keyword=frenzy>\" to a random enemy")
+                .WithText($"Add <keyword={wtg.GUID}.suspected> and \"<keyword={wtg.GUID}.ongoing> <- > <x{{a}}><keyword=frenzy>\" to a random enemy")
                 .WithStackable(true)
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
@@ -2902,7 +2912,6 @@ namespace WildfrostTheGathering
                 })
                 );
 
-
             // Temporary Suspected
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectSafeTemporaryTrait>("Temporary Suspected")
@@ -2932,6 +2941,292 @@ namespace WildfrostTheGathering
                             tcht.trait = TryGet<TraitData>($"{wtg.GUID}.Suspected");
                         })
                     };
+                })
+                );
+
+            // Tarmogoyf: When deployed, gain +1 +1 for each card that's been destroyed this battle
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenDeployedEqualToCardsDestroyedEver>("When Deployed Once Gain Health Attack For Each Card Destroyed This Battle")
+                .WithText("Has <+{a}><keyword=attack> and <+{a}><keyword=health> for each card that's been destroyed this battle")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenDeployedEqualToCardsDestroyedEver>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Increase Attack & Health");
+                    data.applyEqualAmount = true;
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.whenAllyDeployed = false;
+                    data.whenSelfDeployed = true;
+                    data.whenEnemyDeployed = false;
+                    data.clearWhenRecalled = true;
+                })
+                );
+
+            // Tarmogoyf: Gain +1 +1 when a card is destroyed (no text)
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXWhenCardDestroyed>("When Card Destroyed Gain Attack And Health")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXWhenCardDestroyed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Increase Attack & Health");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.mustBeOnBoard = false;
+                })
+                );
+
+            // Winter: Don't count down if in third row
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectOnlyCountDownWhenPredicateUpdateDesc>("Dont Count Down In Third Row")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectOnlyCountDownWhenPredicateUpdateDesc>(data =>
+                {
+                    data.pred = new Predicate<Entity>(target =>
+                    {
+                        CardContainer[] targetsRow = target.containers;
+                        if (targetsRow is null || targetsRow.Length < 1)
+                        {
+                            return true;
+                        }
+                        Debug.Log("[WTG] I'm in row " + targetsRow[0].IndexOf(target) + "!");
+                        if (targetsRow[0].IndexOf(target) == 0)
+                        {
+                            return true;
+                        }
+                        return false;
+                    });
+                })
+                );
+            
+            // Winter: While active apply dont count down in third row if all three card types have been destroyed
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXIfAllCardTypesDestroyed>("When Third Card Type Destroyed Gain While Active Apply Dont Count Down If In Third Row To All Enemies")
+                .WithText("When a clunker, a companion, and an item have all been destroyed this battle, gain \"While Active, only enemies in the first row count down<keyword=counter>\"")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXIfAllCardTypesDestroyed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectWhileActiveX>("While Active Apply Dont Count Down If In Third Row To All Enemies");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.typesWanted = [ "Friendly", "Clunker", "Item" ];
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("active")
+                    };
+                    data.once = true;
+                })
+                );
+
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectWhileActiveX>("While Active Apply Dont Count Down If In Third Row To All Enemies")
+                .WithText("While Active, only enemies in the first row count down<keyword=counter>")
+                .WithStackable(false)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectOnlyCountDownWhenPredicateUpdateDesc>("Dont Count Down In Third Row");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Enemies;
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("active")
+                    };
+                })
+                );
+
+            // Toggo: Trigger when not rock with Zoomlin hits
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Trigger When Not Rock With Zoomlin Hits")
+                .WithText("Trigger when another item with <keyword=zoomlin> hits")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .WithIsReaction(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.descColorHex = "F99C61";
+
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.descColorHex = "F99C61";
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        if (!pred.traits.Any(t => t.data.name == "Zoomlin"))
+                        {
+                            Debug.Log("[WTG] The item didn't have zoomlin...");
+                            return false;
+                        }
+                        if (pred.data.name == $"{wtg.GUID}.toggoRock")
+                        {
+                            Debug.Log("[WTG] That was a rock...");
+                            return false;
+                        }
+                        return true;
+                    });
+                    data.effectToApply = TryGet<StatusEffectInstantTrigger>("Trigger");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSummon>("Summon Rock")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.summonCard = TryGet<CardData>("toggoRock");
+                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("FlipCreateCard");
+                })
+                );
+
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantSummon>("Instant Summon Rock In Hand")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.canSummonMultiple = true;
+                    data.targetSummon = TryGet<StatusEffectSummon>("Summon Rock");
+                    data.summonPosition = StatusEffectInstantSummon.Position.Hand;
+                })
+                );
+
+            // Toggo: Add rocks to hand
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Add Rock To Hand")
+                .WithText("Add <{a}> {0} to your hand")
+                .WithTextInsert($"<card={wtg.GUID}.toggoRock>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Rock In Hand");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.queue = true;
+                    data.separateActions = true;
+                    data.doPing = false;
+                })
+                );
+
+            // Ms. Bumbleflower: Add attack to an enemy on each item hit
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Add Attack To Random Enemy When Item Hits")
+                .WithText($"Add <+{{a}}> <keyword=attack> to a random enemy when an item hits")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.RandomEnemy;
+                })
+                );
+
+            // Ms. Bumbleflower: Add attack and ongoing flying to ally behind on second item hit
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCertainCardPlayed>("Add Attack And Ongoing Flying To Ally Behind When Second Item Hits")
+                .WithText($"Add <+{{a}}> <keyword=attack> and \"<keyword={wtg.GUID}.ongoingflying>\" to ally behind the second time an item hits each turn")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCertainCardPlayed>(data =>
+                {
+                    data.hiddenKeywords = new KeywordData[]
+                    {
+                        TryGet<KeywordData>("Hit"),
+                    };
+                    data.pred = new Predicate<Entity>(pred =>
+                    {
+                        if (!pred.data.hasAttack)
+                        {
+                            Debug.Log("[WTG] The card had no attack...");
+                            return false;
+                        }
+                        ;
+                        if (!pred.data.cardType.item)
+                        {
+                            Debug.Log("[WTG] The card wasn't an item...");
+                            return false;
+                        }
+                        return true;
+                    });
+                    data.onNthTimePlayedPerTurn = [2];
+                    data.effectToApply = TryGet<StatusEffectInstantMultiple>("Instant Gain Attack And Ongoing Flying");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.AllyBehind;
+                })
+                );
+
+            // Bumbleflower: Instant gain attack and ongoing flying
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectInstantMultiple>("Instant Gain Attack And Ongoing Flying")
+                .WithStackable(true)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectInstantMultiple>(data =>
+                {
+                    data.effects = new StatusEffectInstant[]
+                    {
+                        TryGet<StatusEffectInstantIncreaseAttack>("Increase Attack"),
+                    };
+                    data.applyXEffects = new StatusEffectApplyXInstant[]
+                    {
+                        TryGet<StatusEffectApplyXInstant>("Instant Gain Ongoing Flying"),
+                        TryGet<StatusEffectApplyXInstant>("Instant Gain Ongoing Counts As Flying"),
+                    };
+                })
+                );
+
+            // Instant Gain Ongoing Flying
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Gain Ongoing Flying")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Flying");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                })
+                );
+
+            // Instant Gain Ongoing Counts As Flying
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXInstant>("Instant Gain Ongoing Counts As Flying")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXInstant>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectTemporaryTraitOnce>("Ongoing Counts As Flying");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
                 })
                 );
 

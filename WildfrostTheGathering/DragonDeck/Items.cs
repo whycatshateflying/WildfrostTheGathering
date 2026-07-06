@@ -109,6 +109,15 @@ namespace WildfrostTheGathering.DragonDeck
                     {
                         wtg.SStack("Trigger Flying", 1)
                     };
+                    data.targetConstraints = new TargetConstraint[]
+                    {
+                        new Scriptable<TargetConstraintOnBoard>(),
+                        new Scriptable<TargetConstraintHasTrait>(tcht =>
+                        {
+                            tcht.trait = TryGet<TraitData>("Flying");
+                            tcht.ignoreSilenced = false;
+                        }),
+                    };
                     data.canPlayOnEnemy = false;
                     data.canPlayOnFriendly = true;
                 })

@@ -31,6 +31,7 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     wtg.TStack("Flying", 1),
                     wtg.TStack("Draw", 2),
+                    wtg.TStack("CountsAsFlying", 1),
                 };
                 data.startWithEffects = new CardData.StatusEffectStacks[]
                 {
@@ -61,7 +62,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying")
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -91,7 +93,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying")
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -121,7 +124,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying")
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -152,7 +156,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying")
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -182,7 +187,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying")
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -211,6 +217,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.traits = new List<CardData.TraitStacks>
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {

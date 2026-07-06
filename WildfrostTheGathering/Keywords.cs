@@ -14,6 +14,26 @@ namespace WildfrostTheGathering
         {
             Debug.Log("[WTG] Keywords loading!");
 
+            // Ongoing Flying
+            assets.Add(
+                new KeywordDataBuilder(wtg)
+                .Create("ongoingbarrage")
+                .WithTitle("Ongoing - Barrage")  // The in-game name for the upgrade.
+                .WithDescription($"Has <keyword=barrage> until after the next trigger")
+                .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                .WithCanStack(false)  // The keyword does not show its stack number.
+                );
+
+            // Ongoing Flying
+            assets.Add(
+                new KeywordDataBuilder(wtg)
+                .Create("ongoingflying")
+                .WithTitle($"Ongoing - Flying")  // The in-game name for the upgrade.
+                .WithDescription($"Has <keyword={wtg.GUID}.flying> until after the next trigger")
+                .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                .WithCanStack(false)  // The keyword does not show its stack number.
+                );
+
             // Flying
             assets.Add(
                 new KeywordDataBuilder(wtg)
@@ -22,6 +42,18 @@ namespace WildfrostTheGathering
                 .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
                 .WithDescription("Always hits an enemy boss, if applicable|Hits normally if there are none") //Format is body|note.
                 .WithCanStack(false)  // The keyword does not show its stack number.
+                );
+
+            // Invisible: for invisible traits
+            assets.Add(
+                new KeywordDataBuilder(wtg)
+                .Create("invisible")
+                .WithTitle("")  // The in-game name for the upgrade.
+                .WithDescription("")
+                .WithShowName(true)  // Shows name in Keyword box (as opposed to a nonexistant icon).
+                .WithShowIcon(false)
+                .WithCanStack(false)  // The keyword does not show its stack number.
+                .WithShow(false)
                 );
 
             // Fireball targeting mode

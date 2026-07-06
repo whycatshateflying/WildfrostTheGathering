@@ -28,6 +28,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.traits = new List<CardData.TraitStacks>()
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "Woah a token in the companion pool? That\'s not supposed to happen" };
                 })
@@ -47,6 +48,7 @@ namespace WildfrostTheGathering.DragonDeck
                     {
                         wtg.TStack("Flying", 1),
                         wtg.TStack("Spark", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "Woah a token in the companion pool? That\'s not supposed to happen" };
                 })
@@ -71,6 +73,7 @@ namespace WildfrostTheGathering.DragonDeck
                     {
                         wtg.TStack("Flying", 1),
                         wtg.TStack("Spark", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[2] { "<b>*Breathes Fire Loudly*</b>\n<i>How was it stuck in ice?</i>",
                             "<i>\"You see, most places have mice or mosquitoes...\"</i>"};
@@ -94,7 +97,8 @@ namespace WildfrostTheGathering.DragonDeck
                     };
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                        wtg.TStack("Flying", 1)
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "<i>You can never have enough gold</i>" };
                 })
@@ -118,8 +122,9 @@ namespace WildfrostTheGathering.DragonDeck
                     };
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Flying", 1),
-                            wtg.TStack("Eternal", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("Eternal", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[2] { "<i><b>Ryusei</b> and <b>Jugan</b> sealed themselves and the three other dragon spirits in an egg under <b>Boseiju</b>. They hatched 50 years later, reborn as <b>Ao</b>, <b>Kairi</b>, <b>Junji</b>, <b>Atsushi</b>, and <b>Kura</b></i>",
                             "<i>The reborn form of <b>Ryusei</b>, protector of <b>Sokenzan</b></i>" };
@@ -143,6 +148,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.traits = new List<CardData.TraitStacks>()
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "<i>The fear of dragons is as old and as powerful as the fear of death itself</i>" };
                 })
@@ -185,6 +191,7 @@ namespace WildfrostTheGathering.DragonDeck
                     data.traits = new List<CardData.TraitStacks>()
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "<i>If it comes for you, die boldly or die swiftly — for die you will</i>" };
                 })
@@ -251,8 +258,9 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Spark", 1),
-                            wtg.TStack("Flying", 1),
+                        wtg.TStack("Spark", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -274,8 +282,9 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Flying", 1),
-                            wtg.TStack("Trample", 1)
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("Trample", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -299,7 +308,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Flying", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -347,7 +357,8 @@ namespace WildfrostTheGathering.DragonDeck
                     };
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Flying", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[2] { "<b>*Breathes Fire Loudly*</b>\n<i>How was it stuck in ice?</i>",
                             "<i>The undisputed master of the mountains of Shiv</i>"};
@@ -371,7 +382,8 @@ namespace WildfrostTheGathering.DragonDeck
                     };
                     data.traits = new List<CardData.TraitStacks>()
                     {
-                            wtg.TStack("Flying", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.greetMessages = new string[1] { "<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic</i>" };
                 })

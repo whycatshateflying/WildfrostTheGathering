@@ -15,27 +15,54 @@ namespace WildfrostTheGathering
         {
             Debug.Log("[WTG] Traits loading!");
 
+            List<TraitData> targetingModes = [];
+            targetingModes.Add(TryGet<TraitData>("Aimless"));
+            targetingModes.Add(TryGet<TraitData>("Barrage"));
+            targetingModes.Add(TryGet<TraitData>("Longshot"));
+
+            // Ongoing Barrage
+            assets.Add(new TraitDataBuilder(wtg)
+                .Create("OngoingBarrage")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = wtg.Get<KeywordData>("ongoingbarrage");
+                    trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Hit All Enemies In Row") };
+                    trait.overrides = new TraitData[] { };
+                    targetingModes.Add(trait);
+                })
+                );
+
+            // Ongoing Flying
+            assets.Add(new TraitDataBuilder(wtg)
+                .Create("OngoingFlying")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = wtg.Get<KeywordData>("ongoingflying");
+                    trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Prioritize Bosses") };
+                    trait.overrides = new TraitData[] { };
+                    targetingModes.Add(trait);
+                })
+                );
+
             // Flying
-            assets.Add(
-                new TraitDataBuilder(wtg)
+            assets.Add(new TraitDataBuilder(wtg)
                 .Create("Flying")
                 .SubscribeToAfterAllBuildEvent((trait) =>
                 {
                     trait.keyword = wtg.Get<KeywordData>("flying");
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Prioritize Bosses") };
-                    trait.overrides = new TraitData[]
-                    {
-                        TryGet <TraitData>("Aimless"),
-                        TryGet <TraitData>("Barrage"),
-                        TryGet <TraitData>("Longshot"),
-                        TryGet <TraitData>("Fireball")
-                    };
-                    TraitData aimless = TryGet<TraitData>("Aimless");
-                    aimless.overrides = aimless.overrides.With(trait);
-                    TraitData barrage = TryGet<TraitData>("Barrage");
-                    barrage.overrides = barrage.overrides.With(trait);
-                    TraitData longshot = TryGet<TraitData>("Longshot");
-                    longshot.overrides = longshot.overrides.With(trait);
+                    trait.overrides = new TraitData[] { };
+                    targetingModes.Add(trait);
+                })
+                );
+
+            // Counts As Flying
+            assets.Add(
+                new TraitDataBuilder(wtg)
+                .Create("CountsAsFlying")
+                .SubscribeToAfterAllBuildEvent((trait) =>
+                {
+                    trait.keyword = wtg.Get<KeywordData>("invisible");
                 })
                 );
 
@@ -47,19 +74,8 @@ namespace WildfrostTheGathering
                 {
                     trait.keyword = wtg.Get<KeywordData>("fireball");
                     trait.effects = new StatusEffectData[] { wtg.Get<StatusEffectData>("Random Enemy For Zoomlin") };
-                    trait.overrides = new TraitData[]
-                    {
-                        TryGet <TraitData>("Aimless"),
-                        TryGet <TraitData>("Longshot"),
-                        TryGet <TraitData>("Barrage"),
-                        TryGet <TraitData>("Flying")
-                    };
-                    TraitData aimless = TryGet<TraitData>("Aimless");
-                    aimless.overrides = aimless.overrides.With(trait);
-                    TraitData barrage = TryGet<TraitData>("Barrage");
-                    barrage.overrides = barrage.overrides.With(trait);
-                    TraitData longshot = TryGet<TraitData>("Longshot");
-                    longshot.overrides = longshot.overrides.With(trait);
+                    trait.overrides = new TraitData[] { };
+                    targetingModes.Add(trait);
                 })
                 );
 
@@ -128,6 +144,25 @@ namespace WildfrostTheGathering
                 {
                     trait.keyword = TryGet<KeywordData>("suspected");
                     trait.effects = new StatusEffectData[] { TryGet<WildfrostTheGathering.StatusEffectSuspected>("Suspected") };
+                })
+                );
+
+            // UNUSED (I can't be bothered to figure out how to hook something directly onto AfterAllBuildEvent
+            assets.Add(new TraitDataBuilder(wtg)
+                .Create("UNUSED")
+                .SubscribeToAfterAllBuildEvent((bleh) =>
+                {
+                    foreach (TraitData trait in targetingModes)
+                    {
+                        foreach (TraitData otherTrait in targetingModes)
+                        {
+                            if (trait == otherTrait)
+                            {
+                                continue;
+                            }
+                            trait.overrides = trait.overrides.With(otherTrait);
+                        }
+                    }
                 })
                 );
 

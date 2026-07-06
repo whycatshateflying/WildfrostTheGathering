@@ -14,7 +14,7 @@ namespace WildfrostTheGathering.Generic
         internal static void Load(List<object> assets, WildfrostTheGathering wtg)
         {
             Debug.Log("[WTG] Generic companions loading!");
-            // Fear of Sleep Paralysis
+            // Fear of Sleep Paralysis (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("fearOfSleepParalysis", "Fear of Sleep Paralysis", idleAnim: "FloatSquishAnimationProfile")
                 .SetStats(7, 2, 3)
@@ -26,7 +26,8 @@ namespace WildfrostTheGathering.Generic
                 {
                     data.traits = new List<CardData.TraitStacks>
                     {
-                                    wtg.TStack("Flying", 1),
+                        wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.attackEffects = new CardData.StatusEffectStacks[]
                     {
@@ -37,7 +38,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Mulldrifter
+            // Mulldrifter (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("mulldrifter", "Mulldrifter", idleAnim: "FloatAnimationProfile")
                 .SetStats(3, 2, 2)
@@ -50,6 +51,7 @@ namespace WildfrostTheGathering.Generic
                     data.traits = new List<CardData.TraitStacks>
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -59,7 +61,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Nulldrifter
+            // Nulldrifter (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("nulldrifter", "Nulldrifter", idleAnim: "FloatAnimationProfile")
                 .SetStats(4, 2, 4)
@@ -72,6 +74,7 @@ namespace WildfrostTheGathering.Generic
                     data.traits = new List<CardData.TraitStacks>
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
@@ -85,7 +88,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Deadeye Navigator
+            // Deadeye Navigator (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("deadeyeNavigator", "Deadeye Navigator", idleAnim: "WaveAnimationProfile")
                 .SetStats(7, 4, 4)
@@ -103,7 +106,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Beast Whisperer
+            // Beast Whisperer (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("beastWhisperer", "Beast Whisperer", idleAnim: "SwayAnimationProfile")
                 .SetStats(4, 3, 3)
@@ -122,7 +125,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Warren Soultrader
+            // Warren Soultrader (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("warrenSoultrader", "Warren Soultrader", idleAnim: "SwayAnimationProfile")
                 .SetStats(5, 4, 3)
@@ -140,7 +143,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Laboratory Maniac
+            // Laboratory Maniac (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("laboratoryManiac", "Laboratory Maniac", idleAnim: "ShakeAnimationProfile")
                 .SetStats(2, 2, 5)
@@ -158,7 +161,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Springheart Nantuko
+            // Springheart Nantuko (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("springheartNantuko", "Springheart Nantuko", idleAnim: "SwayAnimationProfile")
                 .SetStats(2, 1, 5)
@@ -175,7 +178,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Death's Shadow
+            // Death's Shadow (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("deathsShadow", "Death\'s Shadow", idleAnim: "FloatAnimationProfile")
                 .SetStats(4, 1, 2)
@@ -193,7 +196,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Hydra Omnivore
+            // Hydra Omnivore (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("hydraOmnivore", "Hydra Omnivore", idleAnim: "GiantAnimationProfile")
                 .SetStats(8, 8, 6)
@@ -211,7 +214,7 @@ namespace WildfrostTheGathering.Generic
                 })
                 );
 
-            // Siege Rhino
+            // Siege Rhino (flavor!)
             assets.Add(new CardDataBuilder(wtg)
                 .CreateUnit("siegeRhino", "Siege Rhino", idleAnim: "GiantAnimationProfile")
                 .SetStats(6, 5, 4)
@@ -235,12 +238,14 @@ namespace WildfrostTheGathering.Generic
                 .SetStats(7, 5, 5)
                 .WithPools("GeneralUnitPool")
                 .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithFlavour("Rise, my pretty thing. Why rot in the river when you can serve at my bidding?")
                 .WithValue(50)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
                     data.traits = new List<CardData.TraitStacks>
                     {
                         wtg.TStack("Flying", 1),
+                        wtg.TStack("CountsAsFlying", 1),
                         wtg.TStack("Spark", 1),
                     };
                     data.startWithEffects = new CardData.StatusEffectStacks[]
@@ -267,6 +272,7 @@ namespace WildfrostTheGathering.Generic
                 .SetStats(6, 6, 4)
                 .WithPools("GeneralUnitPool")
                 .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithFlavour("The embodiment of death itself on <b>Ixalan</b>")
                 .WithValue(50)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
@@ -289,6 +295,7 @@ namespace WildfrostTheGathering.Generic
                 .SetStats(6, 4, 5)
                 .WithPools("GeneralUnitPool")
                 .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithFlavour("Its footsteps of today are the lakes of tomorrow")
                 .WithValue(50)
                 .SubscribeToAfterAllBuildEvent(data =>
                 {
@@ -303,6 +310,25 @@ namespace WildfrostTheGathering.Generic
                     };
                     data.greetMessages = new string[] { "Its footsteps of today are the lakes of tomorrow" };
                     })
+                );
+
+            // Tarmogoyf (no art!) (flavor!)
+            assets.Add(new CardDataBuilder(wtg)
+                .CreateUnit("tarmogoyf", "Tarmogoyf", idleAnim: "GiantAnimationProfile")
+                .SetStats(1, 0, 3)
+                .WithPools("GeneralUnitPool")
+                .SetSprites("placeholder-companion.png", "companion-bg.png")
+                .WithFlavour("What doesn't grow, dies. And what dies grows the Tarmogoyf")
+                .WithValue(50)
+                .SubscribeToAfterAllBuildEvent(data =>
+                {
+                    data.startWithEffects = new CardData.StatusEffectStacks[]
+                    {
+                        wtg.SStack("When Deployed Once Gain Health Attack For Each Card Destroyed This Battle", 1),
+                        wtg.SStack("When Card Destroyed Gain Attack And Health", 1),
+                    };
+                    data.greetMessages = new string[] { "What doesn't grow, dies. And what dies grows the Tarmogoyf" };
+                })
                 );
 
             Debug.Log("[WTG] Generic companions loaded!");
