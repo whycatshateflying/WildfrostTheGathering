@@ -8,8 +8,10 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.Assertions.Must;
 using UnityEngine.Events;
 using UnityEngine.Localization;
+using UnityEngine.Pool;
 using UnityEngine.SceneManagement;
 
 namespace WildfrostTheGathering
@@ -667,6 +669,14 @@ namespace WildfrostTheGathering
                 base.OnActionPerformed += ClearAfterAttacking;
                 base.Init();
             }
+            public override IEnumerator StackRoutine(int stacks)
+            {
+                yield return base.StackRoutine(stacks);
+                if (trait.name == $"{WildfrostTheGathering.guid}.CountsAsFlying")
+                {
+                    InvokeGoUpdateEqDragonText();
+                }
+            }
             public override bool RunActionPerformedEvent(PlayAction action)
             {
                 if (cardPlayed)
@@ -693,6 +703,10 @@ namespace WildfrostTheGathering
                 {
                     Debug.Log("[WTG] BEGONE, CREATURE! " + target.name + ". clearing " + name + ". Playaction type: " + action.Name);
                     yield return Remove();
+                    if (trait.name == $"{WildfrostTheGathering.guid}.CountsAsFlying")
+                    {
+                        InvokeGoUpdateEqDragonText();
+                    }
                 }
             }
         }
@@ -1152,13 +1166,24 @@ namespace WildfrostTheGathering
         public class StatusEffectTrample : StatusEffectData
         {
             private List<Entity> targetsBehind = [];
-
+            private List<(Entity deadGuy, List<CardContainer> actualContainersBeforeDeath)> deadGuysActualContainers = [];
+            // Just before the hit (but after PreHit), check the hit compatibility and get the target behind
             public override void Init()
             {
                 base.PostHit += PiercingDamage;
+                base.OnCardPlayed += ClearListOfDeadGuys;
             }
+
+            private IEnumerator ClearListOfDeadGuys(Entity entity, Entity[] targets)
+            {
+                Debug.Log("[WTG] Clearing the list of deadguys");
+                deadGuysActualContainers = [];
+                yield break;
+            }
+
             public override bool RunHitEvent(Hit hit)
             {
+                // Do some preliminary checks. Is it null, does it have targets, and is it mine
                 if (hit == null)
                 {
                     Debug.Log("[WTG] Null hit passed to me. Ignoring...");
@@ -1166,86 +1191,84 @@ namespace WildfrostTheGathering
                 }
                 if (hit.attacker == null || hit.target == null)
                 {
-                    Debug.Log("[WTG] Null targets for attack, nothing to see here... " + hit.attacker?.name + " " + hit.target?.name);
+                    Debug.Log("[WTG] Null target or attacker for attack, nothing to see here... " + hit.attacker?.name + " " + hit.target?.name);
                     return false;
                 }
+                if (hit.attacker != target)
+                {
+                    Debug.Log("[WTG] Abort! Not my hit, not my biz");
+                    return false;
+                }
+
                 List<CardContainer> targetsRow = hit.target.actualContainers;
+
+                // For each row the target is in because of two tall cards
                 foreach (CardContainer container in targetsRow)
                 {
-                    Debug.Log("[WTG] ~~ Pre Hit Against " + hit.target.name + " ~~");
-                    if (hit.attacker != target)
-                    {
-                        Debug.Log("[WTG] [" + target.name + "] Abort! Not my hit, not my biz (" + hit.attacker.name + ")");
-                        return false;
-                    }
-                    if (hit.target == target)
-                    {
-                        Debug.Log("[WTG] I think I'm hitting myself...");
-                    }
-
-                    CardContainer group = container.Group;
+                    CardContainer group = container.Group;  // For ease of use
 
                     int index = group.IndexOf(hit.target);
 
                     Entity potentialTarget = group.FirstOrDefault(entity => group.IndexOf(entity) == index + 1);  // Access group[index + 1] cause it doesn't function correctly
 
-                    // Logic for adding targets. Alive, a + e, and isn't a duplicate
-                    if (index <= group.max && index != -1 && potentialTarget != null)
+                    // Logic for adding targets. Alive, a + e, and isn't a duplicate. Also isn't the end of the row
+                    // Then check for clunker logic
+                    // If all that passes, add it to the potentialtarget list
+                    if (index > group.max || index == -1 || potentialTarget == null)
                     {
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Checking eligibility for hit against " + potentialTarget.name);
-                        if (!potentialTarget.isActiveAndEnabled)
-                        {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't active and enabled!");
-                            continue;
-                        }
-                        if (!potentialTarget.alive)
-                        {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't alive!");
-                            continue;
-                        }
-                        if (targetsBehind.IndexOf(potentialTarget) != -1)
-                        {
-                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " is already in the queue!");
-                            continue;
-                        }
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Nope! it's at the end of the line! The index was " + index + ". The thing at index " + (index + 1) + " was " + potentialTarget?.name);
+                        continue;
+                    }
 
-                        if (hit.target.data.IsClunker)
+                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Checking eligibility for hit against " + potentialTarget.name);
+                    if (!potentialTarget.isActiveAndEnabled)
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't active and enabled!");
+                        continue;
+                    }
+                    if (!potentialTarget.alive)
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " isn't alive!");
+                        continue;
+                    }
+                    if (targetsBehind.IndexOf(potentialTarget) != -1)
+                    {
+                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + potentialTarget.name + " is already in the queue!");
+                        continue;
+                    }
+
+                    // Perform clunker checks. If it's a clunker at 1, trample over with 1 damage. If it's a clunker at more, stop the trampling
+                    if (hit.target.data.IsClunker)
+                    {
+                        bool moveToNextGuy = false;  // (Can't use a "continue outside for" inside nested for loops)
+                        foreach (StatusEffectData statusEffect in hit.target.statusEffects)
                         {
-                            bool flag = false;
-                            foreach (StatusEffectData statusEffect in hit.target.statusEffects)
-                            {
-                                if (statusEffect == null || statusEffect.name != "Scrap")
-                                {
-                                    continue;
-                                }
-                                Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Aha! " + hit.target.name + " is a clunker!");
-                                if (statusEffect.count <= 1)
-                                {
-                                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " is gonna die, let the trample damage through");
-                                    continue;
-                                }
-                                else
-                                {
-                                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " isn't gonna die, so there's no more trampling!");
-                                    flag = true;
-                                    break;
-                                }
-                            }
-                            if (flag)
+                            if (statusEffect == null || statusEffect.name != "Scrap")
                             {
                                 continue;
                             }
+                            Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Aha! " + hit.target.name + " is a clunker!");
+                            if (statusEffect.count <= 1)
+                            {
+                                Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " is gonna die, let the trample damage through");
+                                continue;
+                            }
+                            else
+                            {
+                                Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] " + hit.target.name + " isn't gonna die, so there's no more trampling!");
+                                moveToNextGuy = true;
+                                break;
+                            }
                         }
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Adding " + potentialTarget.name);
-                        targetsBehind.AddIfNotNull(potentialTarget);
+                        if (moveToNextGuy)
+                        {
+                            continue;
+                        }
                     }
-                    else
-                    {
-                        Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Nope! it's at the end of the line! The index was " + index + ". The thing at index " + (index + 1) + " was " + potentialTarget?.name);
-                    }
+                    Debug.Log("[WTG] [" + targetsRow.IndexOf(container) + "] Adding " + potentialTarget.name);
+                    targetsBehind.AddIfNotNull(potentialTarget);
                 }
-                Debug.Log("[WTG] ~~ End ~~");
-
+                deadGuysActualContainers.Add((hit.target, hit.target.actualContainers));
                 return false;
             }
             public override bool RunPostHitEvent(Hit hit)
@@ -1258,6 +1281,7 @@ namespace WildfrostTheGathering
             }
             private IEnumerator PiercingDamage(Hit hit)
             {
+                // Do the same checks for hit validity
                 if (hit == null)
                 {
                     Debug.Log("[WTG] Null hit passed to me. Ignoring...");
@@ -1270,8 +1294,6 @@ namespace WildfrostTheGathering
                 }
 
                 Debug.Log("[WTG] ~~ Post Hit Against " + hit.target.name + " ~~");
-
-                Debug.Log("[WTG] ~~ Pre Hit Against " + hit.target.name + " ~~");
                 if (hit.attacker != target)
                 {
                     Debug.Log("[WTG] [" + target.name + "] Abort! Not my hit, not my biz (" + hit.attacker.name + ")");
@@ -1284,36 +1306,31 @@ namespace WildfrostTheGathering
 
                 Debug.Log("[WTG] Target was " + hit.target.name);
 
-                int excessDamage = 0;
+                // If it's a clunker, check if it died. If it didn't, cut it from consideration
                 if (hit.target.data.IsClunker)
                 {
                     Debug.Log("[WTG] ~~ Clunker Code Starting ~~");
-                    bool hasScrapStill = false;
+
                     foreach (StatusEffectData statusEffect in hit.target.statusEffects)
                     {
-                        Debug.Log("[WTG] " + statusEffect.name + " has a stack of " + statusEffect.count);
-                        if (statusEffect.name == "Scrap")
+                        Debug.Log("[WTG] " + statusEffect.name + " has a stack size of " + statusEffect.count);
+                        if (statusEffect.name == "Scrap" && statusEffect.count > 0)
                         {
-                            hasScrapStill = true;
+                            Debug.Log("[WTG] " + hit.target.name + " Still has scrap. Abort!");
+                            Debug.Log("[WTG] ~~ Clunker Code Ending ~~");
+                            Debug.Log("[WTG] ~~ End ~~");
+                            yield break;
                         }
                     }
-                    if (!hasScrapStill)
-                    {
-                        Debug.Log("[WTG] " + hit.target.name + " doesn't have scrap so it's died. Reducing the damage by 1");
-                        excessDamage--;
-                    }
-                    else
-                    {
-                        Debug.Log("[WTG] " + hit.target.name + " Still has scrap. Abort!");
-                        Debug.Log("[WTG] ~~ Clunker Code Ending ~~");
-                        Debug.Log("[WTG] ~~ End ~~");
-                        yield break;
-                    }
+                    Debug.Log("[WTG] " + hit.target.name + " doesn't have scrap so it died. Continuing with normal logic");
                     Debug.Log("[WTG] ~~ Clunker Code Ending ~~");
                 }
+
+                // Calculate excess damage
+
                 if (hit.target.hp.current >= 0 && !hit.target.data.IsClunker)
                 {
-                    Debug.Log("[WTG] No excess damage (" + hit.target.name + " has 0 health)");
+                    Debug.Log("[WTG] No excess damage (" + hit.target.name + " has 0 or more health)");
                     Debug.Log("[WTG] ~~ End ~~");
                     if (targetsBehind.Count > 0)
                     {
@@ -1322,26 +1339,37 @@ namespace WildfrostTheGathering
                     yield break;
                 }
 
+                int excessDamage;
                 if (hit.target.data.IsClunker)
                 {
                     excessDamage = hit.damageBlocked - 1;
                 }
                 else
                 {
-                    excessDamage -= hit.target.hp.current;
+                    excessDamage = -hit.target.hp.current;
                 }
 
                 Debug.Log("[WTG] Excess damage done was " + excessDamage);
                 foreach (Entity entity in targetsBehind)
                 {
-                    Debug.Log("[Tutorial] There's " +  entity.name + " in the hit queue!");
+                    Debug.Log("[WTG] \t|There's " +  entity.name + " in the hit queue!");
                 }
 
+                // Add and process the hits. If the target is in a different row then skip it for now (if the attacker is a 2 tall or maybe boop? idk if boop does this but I'm not testing)
+                List<Entity> targetsSkipped = [];
                 while (targetsBehind.Count > 0)
                 {
                     Entity targetBehind = targetsBehind[0];
-                    Debug.Log("[WTG] Checking " + targetBehind.name);
                     targetsBehind.RemoveAt(0);
+                    Debug.Log("[WTG] Checking " + targetBehind.name);
+                    // If there is no entry in deadGuysActualContainers where the deadGuy matches the hit and the group of the dead guy also contains the targetBehind in question
+                    if (!deadGuysActualContainers.Any(pair => pair.deadGuy == hit.target && 
+                                                              pair.actualContainersBeforeDeath.Any(c => c.Group.IndexOf(targetBehind) >= 0)))
+                    {
+                        targetsSkipped.Add(targetBehind);
+                        Debug.Log($"[WTG] {targetBehind.name} wasn't in that row! Whoops!");
+                        continue;
+                    }
                     if (!targetBehind.isActiveAndEnabled)
                     {
                         Debug.Log("[WTG] " + targetBehind.name + " wasn't active and enabled!");
@@ -1358,6 +1386,7 @@ namespace WildfrostTheGathering
                     trampleHit.AddAttackerStatuses();
                     yield return trampleHit.Process();
                 }
+                targetsBehind = targetsBehind.Concat(targetsSkipped).ToList();
                 Debug.Log("[WTG] ~~ End ~~");
             }
         }
@@ -1377,7 +1406,7 @@ namespace WildfrostTheGathering
                 {
                     cardPlayed = true;
                 }
-                return false;
+                return base.RunCardPlayedEvent(entity, targets);
             }
 
             private IEnumerator ClearAfterAttacking(PlayAction action)
@@ -1405,7 +1434,6 @@ namespace WildfrostTheGathering
         public class StatusEffectSuspected : StatusEffectData
         {
             private static List<Hit> hits = [];
-            private List<Entity> targetsBehind = [];
             public override void Init()
             {
                 base.OnHit += HalveDamage;
@@ -1466,6 +1494,7 @@ namespace WildfrostTheGathering
                     Hit pierceHit = new Hit(target, potentialTarget);
                     pierceHit.AddAttackerStatuses();
                     hits.Add(pierceHit);
+                    yield return HalveDamage(pierceHit);
                     yield return pierceHit.Process();
                 }
                 yield break;
@@ -1912,6 +1941,7 @@ namespace WildfrostTheGathering
         public class StatusEffectWhileActiveXUpdatesOnPredicateDeployed : StatusEffectWhileActiveX
         {
             public Predicate<Entity> pred = null;
+            public bool updateWhenFlyingAddedOrRemoved = false;
             public override void Init()
             {
                 base.OnEntityDestroyed += Check;
@@ -1927,8 +1957,10 @@ namespace WildfrostTheGathering
 
             private void UpdateMe()
             {
-                ActionQueue.Add(new ActionSequence(Deactivate()));
-                ActionQueue.Add(new ActionSequence(Activate()));
+                if (active)
+                {
+                    ActionQueue.Add(new ActionRefreshWhileActiveEffect(this));
+                }
             }
 
             public override IEnumerator CardMove(Entity entity)
@@ -2801,7 +2833,6 @@ namespace WildfrostTheGathering
                     Debug.Log("[WTG] " + target.data.title + " is applying " + effect.name);
                     yield return Run(GetTargets());
                 }
-                InvokeGoUpdateEqDragonText();
             }
         }
 
@@ -2961,25 +2992,38 @@ namespace WildfrostTheGathering
             GoUpdateEqDragonText?.Invoke();
         }
 
-        // TODO: Rankle should give flying draw 1
-        // TODO: Maddening Cacophony resets when exit and return
-        // TODO: Make Tarmogoyf be nice and not a hidden when deployed effect
-        // TODO: Conspiracy doesn't make crown on shade sculptor duplicates
-        // TODO: Organize and comment Trample code (bleh)
-        // TODO: Balance Manaform Hellkite
-        // TODO: Manaform hellkite when in hand
+        [HarmonyPatch(typeof(CardSelector), nameof(CardSelector.TakeCard))]
+        class PatchConspiracyCopyGetsCrown
+        {
+            static bool Prefix(ref Entity entity, CardSelector __instance)
+            {
+                if (!(bool)__instance.character || !(bool)entity.data)
+                {
+                    return true;
+                }
+                if (!entity.traits.Any(t => t.data.name == $"{guid}.Conspiracy"))
+                {
+                    Debug.Log("[WTG] It didn't have Conspiracy...");
+                    return true;
+                }
+                Debug.Log("[WTG] Patching EventRoutineCopyItem.Copy");
+                GiveUpgrade("CrownCursed").Run(entity.data);
+                Debug.Log("[WTG] Hopefully it ran?");
+                return true;
+            }
+        }
+
+        // TODO: Mtgbacks crashes for pet house at 3155 (NullReferenceException)
+        // TODO: Maddening Cacophony + manaform hellkite reset when exit and return
         // TODO: Make Delayed Blast Fireball not clear all spice after played
-        // TODO: Make beatable ascendeds
         // TODO: CountsAsFlying shows an empty , , when snother trait is added. This probably needs a harmony patch
         // TODO: Make peppernut charm work for custom effects
         // TODO: Make charms that care about target mode recognize the custom ones (gnome, pom so far)
         // TODO: make zoomlin sound not play twice for treasures added to hand (if possible)
+        // TODO: Make beatable ascendeds
         // TODO: Make Eyedata for the ascendeds
-        // TODO: Make Manaform Hellkite count current attack
         // TODO: Make the enabled exist better for apply to all deck (If possible. Double check with miya to see how)
-        // TODO: eq dragon counter flickers when flying allies in hand are discarded
-        // TODO: eq dragon doesn't update with rankle ongoing flying
-        // TODO: Fix mtg card back
+        // TODO: Fix mtg card back for gunk fruit and junk
 
         private void CreateModAssets()
         {
@@ -3031,6 +3075,12 @@ namespace WildfrostTheGathering
                     .WithSelectSfxEvent(FMODUnity.RuntimeManager.PathToEventReference("event:/sfx/inventory/backpack_opening"))  // The above line may need one of the FMOD references
                     .SubscribeToAfterAllBuildEvent<ClassData>(data =>
                     {
+                        data.id = $"{guid}.Dragon";
+                        var playerCharacter = data.characterPrefab.gameObject.InstantiateKeepName();
+                        UnityEngine.Object.DontDestroyOnLoad(playerCharacter);
+                        playerCharacter.name = $"{guid}.DragonCharacter";
+                        data.characterPrefab = playerCharacter.GetComponent<Character>();
+
                         data.leaders = DataList<CardData>(dragonDeckLeaders.Concat(genericLeaders).ToArray());
                         Inventory inventory = ScriptableObject.CreateInstance<Inventory>();
                         inventory.deck.list = DataList<CardData>("shock", "shock", "shock", "shock", "cancel", "cancel", "swiftfootBoots", "lotusPetal", "treasure").ToList();
@@ -3088,8 +3138,9 @@ namespace WildfrostTheGathering
             gameMode.classes = gameMode.classes.Append(TryGet<ClassData>("Dragon")).ToArray();
             Events.OnEntityCreated += FixImage;
             Events.OnSceneLoaded += SceneLoaded;
-            //Events.OnEntityCreated += SetupMtgBacks;
-            //Events.OnCardPooled += UndoMtgBacks;
+            mtgCardBack = ImagePath("mtg-card-back.png").ToSprite();
+            Events.OnEntityCreated += SetupMtgBacks;
+            Events.OnCardPooled += UndoMtgBacks;
 
             var uiText = LocalizationHelper.GetCollection("UI Text", SystemLanguage.English);
 
@@ -3098,12 +3149,12 @@ namespace WildfrostTheGathering
             uiText.SetString("ChargeBell", "{0} charged the Redraw Bell by [{1}]");
             uiText.SetString("ChargeBellFully", "{0} fully charged the Redraw Bell");
         }
+
         public static Sprite originalCardBack = null;
         public static Sprite mtgCardBack = null;  // The ImagePath function is non-static, so I set it first chance I get
         // To hopefully add an mtg back to my cards
         private void SetupMtgBacks(Entity entity)
         {
-            mtgCardBack = ImagePath("mtg-card-back.png").ToSprite();  // Right here :3
             if (entity.data.original.ModAdded != this)
             {
                 Debug.Log("[WTG] " + entity.name + " is not from my mod :(");
@@ -3115,6 +3166,11 @@ namespace WildfrostTheGathering
                 originalCardBack = ((Card)entity.display).backImage.sprite;
             }
             ((Card)entity.display).backImage.sprite = mtgCardBack;
+            if (((Card)entity.display).backImage.GetComponent<AddressableSpriteLoader>() is AddressableSpriteLoader addressableSpriteLoader)
+            {
+                addressableSpriteLoader.enabled = false;
+            }
+
         }
         // ... And remove them when they're repooled
         private void UndoMtgBacks(Card card)
@@ -3168,8 +3224,8 @@ namespace WildfrostTheGathering
             UnloadFromClasses();
             Events.OnEntityCreated -= FixImage;
             Events.OnSceneLoaded -= SceneLoaded;
-            // Events.OnEntityCreated -= SetupMtgBacks;
-            //Events.OnCardPooled -= UndoMtgBacks;
+            Events.OnEntityCreated -= SetupMtgBacks;
+            Events.OnCardPooled -= UndoMtgBacks;
         }
         private void SceneLoaded(Scene scene)
         {

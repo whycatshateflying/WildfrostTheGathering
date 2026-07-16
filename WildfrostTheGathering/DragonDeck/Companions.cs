@@ -369,7 +369,7 @@ namespace WildfrostTheGathering.DragonDeck
             assets.Add(
                 new CardDataBuilder(wtg).CreateUnit("manaformHellkite", "Manaform Hellkite", idleAnim: "FloatSquishAnimationProfile")
                 .SetSprites("manaform-hellkite-amar.png", "companion-bg.png")
-                .SetStats(5, 2, 4)
+                .SetStats(5, 2, 3)
                 .WithCardType("Friendly")
                 .WithFlavour("<i>Just because it's a big, strong, unthinking beast of the sky intent on burning your house doesn't mean it can't use magic<i>")
                 .WithValue(45)
@@ -378,7 +378,8 @@ namespace WildfrostTheGathering.DragonDeck
                 {
                     data.startWithEffects = new CardData.StatusEffectStacks[]
                     {
-                            wtg.SStack("Summon Dragon Token On Item Played", 1),
+                        wtg.SStack("On Card Played Summon Spark Dragon Token With X Attack", 1),
+                        wtg.SStack("Increase When Item Hits", 1),
                     };
                     data.traits = new List<CardData.TraitStacks>()
                     {

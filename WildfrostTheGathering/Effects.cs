@@ -533,23 +533,6 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Summon Dragon Token with Spark
-            assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectSummon>("Summon Spark Dragon Token")
-                .WithText("Summon {0}")
-                .WithTextInsert($"<card={wtg.GUID}.dragonTokenSpark>")
-                .WithStackable(false)
-                .WithCanBeBoosted(false)
-                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
-                {
-                    data.eventPriority = 99999;
-                    data.summonCard = TryGet<CardData>("dragonTokenSpark");
-                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
-                    data.setCardType = TryGet<CardType>("Summoned");
-                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
-                })
-                );
-
             // Flying: Change the target mode
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectChangeTargetMode>("Prioritize Bosses")
@@ -730,8 +713,19 @@ namespace WildfrostTheGathering
                 {
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        return pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying");
+                        if (!pred.traits.Any(t => t.data.name == $"{wtg.GUID}.CountsAsFlying"))
+                        {
+                            Debug.Log("[WTG] The guy didn't count as flying!");
+                            return false;
+                        }
+                        if (!Battle.IsOnBoard(pred))
+                        {
+                            Debug.Log("[WTG] They weren't on the board!");
+                            return false;
+                        }
+                        return true;
                     });
+                    data.updateWhenFlyingAddedOrRemoved = true;
                     ScriptableTargetsOnBoard scriptAmount = ScriptableTargetsOnBoard.CreateInstance<ScriptableTargetsOnBoard>();
                     scriptAmount.allies = true;
                     scriptAmount.hasTrait = TryGet<TraitData>("CountsAsFlying");
@@ -837,11 +831,10 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Manaform Hellkite: Instant Summon Dragon Token on Item played
+            // Manaform Hellkite: Increase When Item Hits
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>("Summon Dragon Token On Item Played")
-                .WithText("Summon a {0} with equal <keyword=attack> when an item deals damage")
-                .WithTextInsert($"<card={wtg.GUID}.dragonTokenSpark>")
+                .Create<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>("Increase When Item Hits")
+                .WithText("Increase by {a} when an item hits")
                 .WithStackable(true)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXEqualToAttackOnCertainCardPlayed>(data =>
@@ -849,7 +842,7 @@ namespace WildfrostTheGathering
                     data.summonQueue = true;
                     data.pred = new Predicate<Entity>(pred =>
                     {
-                        if (pred.data.damage < 1 || pred.data.hasAttack == false)
+                        if (pred.data.damage < 0 || pred.data.hasAttack == false)
                         {
                             Debug.Log("[WTG] The card did not have enough attack...");
                             return false;
@@ -861,16 +854,29 @@ namespace WildfrostTheGathering
                         }
                         return true;
                     });
-                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack");
+                    data.effectToApply = TryGet<StatusEffectInstantIncreaseEffects>("Increase Effects");
                     data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
-                    data.applyEqualAmount = true;
+                })
+                );
+
+            // Manaform Hellkite: Summon Dragon Token On Attack
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Summon Spark Dragon Token With X Attack")
+                .WithText($"Summon <card={wtg.GUID}.dragonTokenSpark> with <{{a}}><keyword=attack>")
+                .WithStackable(true)
+                .WithCanBeBoosted(true)
+                .SubscribeToAfterAllBuildEvent<StatusEffectApplyXOnCardPlayed>(data =>
+                {
+                    data.effectToApply = TryGet<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Attack");
+                    data.applyToFlags = StatusEffectApplyX.ApplyToFlags.Self;
+                    data.eventPriority = 99999;
                 })
                 );
 
             // Manaform Hellkite: Instant summon Dragon Token with equal attack
             assets.Add(new StatusEffectDataBuilder(wtg)
-                .Create<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Health and Attack")
-                .WithStackable(false)
+                .Create<StatusEffectInstantSummon>("Instant Summon Spark Dragon Token With X Attack")
+                .WithStackable(true)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectInstantSummon>(data =>
                 {
@@ -882,6 +888,23 @@ namespace WildfrostTheGathering
                         TryGet<StatusEffectInstantSetAttack>("Set Attack"),
                     };
                     data.queue = false;
+                })
+                );
+
+            // Summon Dragon Token with Spark
+            assets.Add(new StatusEffectDataBuilder(wtg)
+                .Create<StatusEffectSummon>("Summon Spark Dragon Token")
+                .WithText("Summon {0}")
+                .WithTextInsert($"<card={wtg.GUID}.dragonTokenSpark>")
+                .WithStackable(false)
+                .WithCanBeBoosted(false)
+                .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
+                {
+                    data.eventPriority = 99999;
+                    data.summonCard = TryGet<CardData>("dragonTokenSpark");
+                    data.gainTrait = TryGet<StatusEffectTemporaryTrait>("Temporary Summoned");
+                    data.setCardType = TryGet<CardType>("Summoned");
+                    data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
 
@@ -2711,7 +2734,7 @@ namespace WildfrostTheGathering
                 })
                 );
 
-            // Rankle: After turn, gain Visual Ongoing barrage or flying, draw 1 randomly
+            // Rankle: After turn, gain Ongoing barrage or flying, randomly
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXAfterTurn>("After Turn Randomly Gain Ongoing Flying Or Ongoing Barrage")
                 .WithText($"After attacking, randomly gain \"<keyword={wtg.GUID}.ongoingflying>\" or \"<keyword={wtg.GUID}.ongoingbarrage>\"")
@@ -2833,7 +2856,7 @@ namespace WildfrostTheGathering
                 .SubscribeToAfterAllBuildEvent<StatusEffectSummon>(data =>
                 {
                     data.eventPriority = 99999;
-                    data.summonCard = TryGet<CardData>("clueToken");
+                    data.summonCard = TryGet<CardData>("clueToken"); 
                     data.effectPrefabRef = new UnityEngine.AddressableAssets.AssetReference("SummonCreateCard");
                 })
                 );
