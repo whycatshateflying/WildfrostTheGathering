@@ -490,7 +490,7 @@ namespace WildfrostTheGathering.Generic
             // Boros Charm
             assets.Add(new CardDataBuilder(wtg)
                 .CreateItem("borosCharm", "Boros Charm", idleAnim: "PulseAnimationProfile")
-                .SetDamage(3)
+                .SetDamage(4)
                 .WithPools("GeneralItemPool")
                 .WithFlavour("\"Practice compassion and mercy. But know when they must end\"\n<b>—Aurelia</b>")
                 .SetSprites("boros-charm-zboros.png", "item-bg.png")

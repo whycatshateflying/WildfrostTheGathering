@@ -2595,7 +2595,7 @@ namespace WildfrostTheGathering
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 );
-
+            
             // Obeka: Charge redraw bell on attack
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXOnCardPlayed>("On Card Played Charge Redraw Bell Fully")
@@ -3025,7 +3025,7 @@ namespace WildfrostTheGathering
             // Winter: While active apply dont count down in third row if all three card types have been destroyed
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectApplyXIfAllCardTypesDestroyed>("When Third Card Type Destroyed Gain While Active Apply Dont Count Down If In Third Row To All Enemies")
-                .WithText("When a clunker, a companion, and an item have all been destroyed this battle, gain \"While Active, only enemies in the first row count down<keyword=counter>\"")
+                .WithText("When a clunker, a companion, and an item have all been destroyed this battle, gain \"While active, only enemies in the first row count down<keyword=counter>\"")
                 .WithStackable(false)
                 .WithCanBeBoosted(false)
                 .SubscribeToAfterAllBuildEvent<StatusEffectApplyXIfAllCardTypesDestroyed>(data =>
@@ -3043,7 +3043,7 @@ namespace WildfrostTheGathering
 
             assets.Add(new StatusEffectDataBuilder(wtg)
                 .Create<StatusEffectWhileActiveX>("While Active Apply Dont Count Down If In Third Row To All Enemies")
-                .WithText("While Active, only enemies in the first row count down<keyword=counter>")
+                .WithText("While active, only enemies in the first row count down<keyword=counter>")
                 .WithStackable(false)
                 .WithCanBeBoosted(true)
                 .SubscribeToAfterAllBuildEvent<StatusEffectWhileActiveX>(data =>

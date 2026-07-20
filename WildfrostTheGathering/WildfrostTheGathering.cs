@@ -296,6 +296,7 @@ namespace WildfrostTheGathering
         public class StatusEffectApplyXWhenDeployedNoHand : StatusEffectApplyXWhenDeployed
         {
             public bool summonQueue = false;
+            public List<ulong> doNotCareAboutOnReload = [];
             public override void Init()
             {
                 if (summonQueue)
@@ -304,7 +305,8 @@ namespace WildfrostTheGathering
                     base.OnCardMove += ActivateUseQueue;
                 }
                 else
-                    base.Init();
+                    base.OnEnable += ActivateFancy;
+                    base.OnCardMove += ActivateFancy;
             }
 
             private IEnumerator ActivateUseQueue(Entity entity)
@@ -328,9 +330,51 @@ namespace WildfrostTheGathering
                 {
                     return false;
                 }
+                Debug.Log($"[WTG] Checking {entity.name} for deployed status");
+                // Make up for the missing isAlreadyOnBoard of the base
+                if (doNotCareAboutOnReload.Any(i => i == entity.data.id))
+                {
+                    Debug.Log($"[WTG] {entity.name} is in the ignore list!");
+                    return false;
+                }
                 return base.RunCardMoveEvent(entity);
             }
 
+            public override bool RunEnableEvent(Entity entity)
+            {
+                if (!Battle.IsOnBoard(target))
+                {
+                    return false;
+                }
+                Debug.Log($"[WTG] Checking {entity.name} for deployed status");
+                // Make up for the missing isAlreadyOnBoard of the base
+                if (doNotCareAboutOnReload.Any(i => i == entity.data.id))
+                {
+                    Debug.Log($"[WTG] {entity.name} is in the ignore list!");
+                    return false;
+                }
+                return base.RunEnableEvent(entity);
+            }
+
+            private IEnumerator ActivateFancy(Entity entity)
+            {
+                doNotCareAboutOnReload.Add(entity.data.id);
+                return base.Activate(entity);
+            }
+
+            // Credit to Semmie for helping me with the mid battle reload code!
+            public override object GetMidBattleData()
+            {
+                return new SaveCollection<ulong>(doNotCareAboutOnReload);
+            }
+
+            public override void RestoreMidBattleData(object data)
+            {
+                if (data is SaveCollection<ulong> ids)
+                {
+                    doNotCareAboutOnReload = ids.collection.ToList();
+                }
+            }
         }
 
         // Only apply the deployed effect if the deployed meets a predicate (Thank you ME for BEING AWESOME and DOING IT MYSELF)
@@ -2353,6 +2397,7 @@ namespace WildfrostTheGathering
                 Events.InvokeCardDraw(count);
                 while (count > 0)
                 {
+                    Debug.Log("[WTG] I'm starting to tutor!");
                     yield return Sequences.Wait(pauseBetween);  // Wait
 
                     List<Entity> cards = [];
@@ -2374,15 +2419,17 @@ namespace WildfrostTheGathering
                         }
                     }
 
-                    if (!foundCard)  // If that didn't work, cry about it cause shuffling only works on an empty pile also that'd be weird
+                    if (!(bool)foundCard)  // If that didn't work, cry about it cause shuffling only works on an empty pile also that'd be weird
                     {
                         Events.InvokeCardDrawEnd();
                         Debug.Log("[WTG] No tutor targets :(");
+                        count--;
+                        continue;
                     }
 
                     if ((bool)foundCard)  // Move the new card to hand
                     {
-                        Debug.Log("[WTG] Card found is " + foundCard.name + ". Top card in deck is " + character.drawContainer.GetTop().name);
+                        Debug.Log("[WTG] Card found is " + foundCard.name + ". Top card in deck is " + character.drawContainer.GetTop()?.name);
                         yield return Sequences.CardMove(foundCard, new CardContainer[1] { character.handContainer });
                         character.handContainer.TweenChildPositions();
 
@@ -2976,13 +3023,6 @@ namespace WildfrostTheGathering
                 yield return Remove();
             }
         }
-        // For clean WhileActiveX to update on move
-        public static event UnityAction OnShoveEnd;
-        public static void InvokeOnShoveEnd()
-        {
-            Debug.Log("[WTG] On shove end Invoked!");
-            OnShoveEnd?.Invoke();
-        }
 
         // Rankle adding an event for eq dragon to update
         public static event UnityAction GoUpdateEqDragonText;
@@ -2992,6 +3032,7 @@ namespace WildfrostTheGathering
             GoUpdateEqDragonText?.Invoke();
         }
 
+        // Patch to make copying conspiracies give the crown
         [HarmonyPatch(typeof(CardSelector), nameof(CardSelector.TakeCard))]
         class PatchConspiracyCopyGetsCrown
         {
@@ -3006,24 +3047,103 @@ namespace WildfrostTheGathering
                     Debug.Log("[WTG] It didn't have Conspiracy...");
                     return true;
                 }
+                if (entity.data.upgrades.Any(u=>u.type == CardUpgradeData.Type.Crown))
+                {
+                    Debug.Log("[WTG] It had a Crown though...");
+                    return true;
+                }
                 Debug.Log("[WTG] Patching EventRoutineCopyItem.Copy");
                 GiveUpgrade("CrownCursed").Run(entity.data);
                 Debug.Log("[WTG] Hopefully it ran?");
                 return true;
             }
         }
+        
+        // Remove the trailing ", ," with countsAsFlying(keyword name invisible)
+        [HarmonyPatch(typeof(Card), nameof(Card.AddTraitText), new Type[] { typeof(string), typeof(CardData), typeof(bool) }, [ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal])]
+        class PatchNoTrailingCommaCardData
+        {
+            public static bool Prefix(ref string text, CardData data, bool silenced)
+            {
+                if (data.traits == null || data.traits.Count <= 0)
+                {
+                    return false;
+                }
 
-        // TODO: Mtgbacks crashes for pet house at 3155 (NullReferenceException)
-        // TODO: Maddening Cacophony + manaform hellkite reset when exit and return
+                int count = data.traits.Count;
+                data.traits.Where(t => t.data.keyword.name == $"{guid}.invisible").ToList().ForEach(t =>
+                {
+                    Debug.Log($"[WTG] Trait found is {t.data.name} and the associated keyword is {t.data.keyword.name}");
+                });
+                string traitSeparator = Card.GetTraitSeparator(count);
+                string text2 = "";
+                for (int i = 0; i < count; i++)
+                {
+                    CardData.TraitStacks traitStacks = data.traits[i];
+                    Debug.Log($"[WTG] Proccessing the keyword text for {traitStacks.data.name}. The keyword name is {traitStacks.data.keyword.name}");
+                    text2 += Card.GetTraitText(traitStacks.data, traitStacks.count, silenced);
+                    if (i < count - 1 && data.traits[i+1].data.keyword.name != $"{guid}.invisible")
+                    {
+                        text2 += traitSeparator;
+                    }
+                }
+
+                if (!text2.IsNullOrWhitespace())
+                {
+                    text = text + "\n" + text2;
+                }
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(Card), nameof(Card.AddTraitText), new Type[] { typeof(string), typeof(Entity) }, [ArgumentType.Ref, ArgumentType.Normal])]
+        class PatchNoTrailingCommaEntity
+        {
+            public static bool Prefix(ref string text, Entity entity)
+            {
+                if (entity.traits == null || entity.traits.Count <= 0)
+                {
+                    return false;
+                }
+
+                int count = entity.traits.Count;
+                entity.traits.Where(t => t.data.keyword.name == $"{guid}.invisible").ToList().ForEach(t =>
+                {
+                    Debug.Log($"[WTG] Trait found is {t.data.name} and the associated keyword is {t.data.keyword.name}");
+                });
+                string traitSeparator = Card.GetTraitSeparator(count);
+                string text2 = "";
+                for (int i = 0; i < count; i++)
+                {
+                    Entity.TraitStacks traitStacks = entity.traits[i];
+                    Debug.Log($"[WTG] Proccessing the keyword text for {traitStacks.data.name}. The keyword name is {traitStacks.data.keyword.name}");
+                    text2 += Card.GetTraitText(traitStacks.data, traitStacks.count, entity.silenced || traitStacks.silenced);
+                    if (i < count - 1 && entity.traits[i + 1].data.keyword.name != $"{guid}.invisible")
+                    {
+                        text2 += traitSeparator;
+                    }
+                }
+
+                if (!text2.IsNullOrWhitespace())
+                {
+                    text = text + "\n" + text2;
+                }
+                return false;
+            }
+        }
+
+        // TODO: Maddening Cacophony + manaform hellkite reset when reload
+        // TODO: Check for winter on reload
+        // TODO: Check for unplayable on reload
         // TODO: Make Delayed Blast Fireball not clear all spice after played
-        // TODO: CountsAsFlying shows an empty , , when snother trait is added. This probably needs a harmony patch
+        // TODO: Slip out the back phase out doesn't show up
         // TODO: Make peppernut charm work for custom effects
         // TODO: Make charms that care about target mode recognize the custom ones (gnome, pom so far)
         // TODO: make zoomlin sound not play twice for treasures added to hand (if possible)
         // TODO: Make beatable ascendeds
         // TODO: Make Eyedata for the ascendeds
         // TODO: Make the enabled exist better for apply to all deck (If possible. Double check with miya to see how)
-        // TODO: Fix mtg card back for gunk fruit and junk
+        // TODO: Add a config for mtg card backs (either all cards always, or only cards in my mod, or none)
 
         private void CreateModAssets()
         {
@@ -3155,16 +3275,20 @@ namespace WildfrostTheGathering
         // To hopefully add an mtg back to my cards
         private void SetupMtgBacks(Entity entity)
         {
-            if (entity.data.original.ModAdded != this)
+            Debug.Log($"[WTG] entity: \t{entity.name}");
+            Debug.Log($"[WTG] data: \t{entity.data}");
+            Debug.Log($"[WTG] original: \t{entity.data.original}");
+            Debug.Log($"[WTG] modadded: \t{entity.data.original?.ModAdded}");
+            if (originalCardBack is null && ((Card)entity.display).backImage.GetComponent<AddressableSpriteLoader>() is AddressableSpriteLoader asl && asl.IsImage)
+            {
+                originalCardBack = asl.image.sprite;
+            }
+            if (entity.data.original?.ModAdded != this)
             {
                 Debug.Log("[WTG] " + entity.name + " is not from my mod :(");
                 return;
             }
             Debug.Log("[WTG] Changing the card back for " + entity.data.name);
-            if (originalCardBack == null)
-            {
-                originalCardBack = ((Card)entity.display).backImage.sprite;
-            }
             ((Card)entity.display).backImage.sprite = mtgCardBack;
             if (((Card)entity.display).backImage.GetComponent<AddressableSpriteLoader>() is AddressableSpriteLoader addressableSpriteLoader)
             {
@@ -3175,13 +3299,14 @@ namespace WildfrostTheGathering
         // ... And remove them when they're repooled
         private void UndoMtgBacks(Card card)
         {
-            if (card.entity.data.original.ModAdded != this)
+            if (card.entity.data.original?.ModAdded == this)
             {
-                Debug.Log("[WTG] " + card.entity.name + " is not from my mod :(");
+                Debug.Log("[WTG] Resetting the card back for " + card.name);
+                card.backImage.sprite = originalCardBack;
                 return;
             }
-            Debug.Log("[WTG] Resetting the card back for " + card.name);
-            card.backImage.sprite = originalCardBack;
+            Debug.Log("[WTG] " + card.entity.name + " is not from my mod :(");
+            return;
         }
 
 
